@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.13 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Host.pm,v 1.16 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -37,7 +37,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '1.8';
+$VERSION = '2.090';
 
 ######################################################################
 #### Globals
@@ -93,7 +93,9 @@ sub get_undef {
 
 sub classes_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(field, classesref))';
-    my $classesref = shift; (ref($classesref)) or croak 'usage: '.__PACKAGE__.'->classes_match(field, classesref))';
+    my $classesref = shift;
+    return 1 if !defined $classesref;  # Null reference means match everything
+    (ref($classesref)) or croak 'usage: '.__PACKAGE__.'->classes_match(field, classesref))';
     foreach (@{$classesref}) {
 	return 1 if get_undef($self, $_);
     }
@@ -130,7 +132,7 @@ sub rating {
     $rate *= ($self->adj_load+1);
     # Discount by cpus & frequency
     $rate /= $self->cpus;
-    $rate /= $self->max_clock;
+    $rate /= $self->max_clock * 0.4;   # 1 free cpu at 300Mhz beat 50% of a 600 Mhz cpu
 
     #printf "%f * (%d+%d+1) / %f / %f = %f\n", ($self->total_pctcpu+1), $self->report_load, $self->adj_load, $self->cpus, $self->max_clock, $rate if $Debug;
     return ($rate>0)?log($rate):0;	# Make a more readable number

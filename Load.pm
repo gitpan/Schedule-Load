@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.48 2002/03/18 14:43:19 wsnyder Exp $
+# $Id: Load.pm,v 1.50 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -44,7 +44,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '1.8';
+$VERSION = '2.090';
 $Debug = 0;
 
 %_Default_Params = (
@@ -146,6 +146,7 @@ sub new {
     }
 
     my $fh;
+    $? = 0;
     {
 	local $SIG{__WARN__} = sub {
 	    return if $_[0] =~ /Connection refused/;

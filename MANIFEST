@@ -1,6 +1,7 @@
 COPYING
 Load.pm
 Load/Chooser.pm
+Load/FakeReporter.pm
 Load/Hosts.pm
 Load/Hosts/Host.pm
 Load/Hosts/Proc.pm

@@ -1,6 +1,6 @@
-#!/usr/local/bin/perl -Tw
+#!/usr/local/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.15 2002/03/18 14:43:19 wsnyder Exp $
+# $Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -23,7 +23,7 @@
 
 require 5.004;
 use lib 'blib/lib';	# testing
-use FindBin qw($Script);
+use FindBin qw($RealBin $RealScript $Script);
 use Getopt::Long;
 use Pod::Text;
 use Sys::Syslog;
@@ -32,6 +32,8 @@ use POSIX;
 use strict;
 
 BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
+
+$SIG{PIPE} = 'IGNORE';
 
 ######################################################################
 # configuration
@@ -58,13 +60,18 @@ if (!GetOptions (
 		 "quiet!"	=> \$opt_quiet,	# Debugging
 		 "fork!"	=> \$opt_fork,	# Debugging/Test script
 		 "port=i"	=> sub {shift; $server_params{port} = shift;},
-		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, split(':',shift);},
 		 )) {
     &usage();
 }
 
 autoflush STDOUT 1;
 autoflush STDERR 1;
+
+# We're chdiring to /, so make sure program name has path
+if ($0 !~ m!^/!) { $0 = getcwd()."/".$0; }
+chdir "/";	# Change immediately to aid debugging of $0 change
+
 if ($opt_quiet && !$Debug) {
     if ($opt_fork) {
 	# Fork once to let parent die
@@ -110,7 +117,9 @@ while (1) {
     sleep(1);
     # Restart this program by re-execing; allows users to restart the daemon
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-    exec $0, @Orig_ARGV if -r $0;
+    print "exec $0, @Orig_ARGV\n" if $Debug;
+    exec $0, @Orig_ARGV if -x $0;
+    # If can't exec we simply start the server again
 }
 
 exit (0);
@@ -118,7 +127,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.15 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -126,7 +135,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.15 2002/03/18 14:43:19 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

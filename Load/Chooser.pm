@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.27 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Chooser.pm,v 1.32 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.8';
+$VERSION = '2.090';
 
 ######################################################################
 #### Globals
@@ -283,8 +283,15 @@ sub _client_send {
     # Send any arguments to the client
     # Returns 0 if failed, else 1
 
+    $SIG{PIPE} = 'IGNORE';
+
     my $fh = $client->{socket};
     while ($out ne "") {
+	if (!$fh || !$fh->connected()) {
+	    # EOF before eval???
+	    _client_close ($client);
+	    return 0;
+	}
 	my $rv = eval { return $fh->send($out, 0); };
 	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
 	    # EOF???
@@ -510,7 +517,7 @@ sub _schedule {
     # Choose the best host and total resources available for scheduling
     my $schparams = shift;  #favor_host, classes, _is_night
     
-    my $jobs = 0;
+    my $freejobs = 0;
     my $bestref = undef;
     my $bestload = undef;
     my $favorref = undef;
@@ -518,8 +525,7 @@ sub _schedule {
     my $freecpu = 0;
     foreach my $host (@{$Hosts->hosts}) {
 	#print "What about ", $host->hostname, "\n" if $Debug;
-	if ((! $schparams->{classes}
-	     || $host->classes_match ($schparams->{classes}))
+	if ($host->classes_match ($schparams->{classes})
 	    && !$host->reserved) {
 	    my $rating = $host->rating;
 	    #print "Test host ", $host->hostname," rate $rating\n" if $Debug;
@@ -528,7 +534,7 @@ sub _schedule {
 		my $machjobs = ($host->cpus - $host->adj_load);
 		$machjobs = 0 if ($machjobs < 0);
 		$machjobs = int ($machjobs + .7);
-		$jobs += $machjobs;
+		$freejobs += $machjobs;
 		if ($host == $favorhost && $machjobs) {
 		    # Found the favored host has resources, force it to win
 		    $favorref = $host;
@@ -544,7 +550,13 @@ sub _schedule {
 	}
     }
 
-    $jobs = _min($jobs, $schparams->{max_jobs}) if ($schparams->{max_jobs}>0);
+    my $jobs = $freejobs;
+    if ($schparams->{max_jobs}<=0) {  # Fraction that's percent of clump if negative
+	$jobs = int($freejobs * (-$schparams->{max_jobs}));
+    } else {
+	$jobs = _min($jobs, $schparams->{max_jobs});
+    }
+    $jobs = _min($jobs, $freejobs);
     $jobs = _max($jobs, 1);
 
     if ($schparams->{allow_none} && !$freecpu) {

@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.18 2001/12/06 18:24:47 wsnyder Exp $
+#$Id: test.pl,v 1.21 2002/08/01 15:43:05 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -7,16 +7,17 @@
 
 use Sys::Hostname;
 use IO::Socket;
+use Cwd;
 use Test;
 
-BEGIN { plan tests => 3 }
+BEGIN { plan tests => 15 }
 
 $SIG{INT} = \&cleanup_and_exit;
 
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..12\n";
+BEGIN { $| = 1;
 	print "****NOTE****: You need 'slchoosed &' and 'slreportd &' running for this test!\n";
 	print "** I'm starting them under a subprocess\n";
     }
@@ -29,7 +30,7 @@ BEGIN {
 
 use Schedule::Load::Schedule;
 $loaded = 1;
-ok(1);
+ok(1); #2
 
 if ($Schedule::Load::_Default_Params{port} =~ /^\d$/) {
     print "%Note: You do not have slchoosed in /etc/services, may want to add\nslchoosed\t1752/tcp\t\t\t# Schedule::Load\n\n";
@@ -37,10 +38,12 @@ if ($Schedule::Load::_Default_Params{port} =~ /^\d$/) {
 
 ######################### End of black magic.
 
+$Manual_Server_Start = 0;
+
 %Host_Load = ();  # min loading on each host
 %Hold_Keys = ();  # holding keys in use
 
-$Port = socket_find_free (12123);
+$Port = 12123;  $Port = socket_find_free (12123) if !$Manual_Server_Start;
 %Invoke_Params = ( dhost => hostname(),
 		   port => $Port,	# Fake port number so can test new version while running old
 		   );
@@ -57,24 +60,26 @@ mkdir ('test_store', 0777);
 ############
 # Start servers
 
-if (1) {
+if (!$Manual_Server_Start) {
     start_server ("./slchoosed --nofork");
     sleep 1;
-    start_server ("./slreportd class_verilog=1 reservable=1 --nofork --stored_filename=./test_store/".hostname());
+    start_server ("./slreportd class_verilog=1 reservable=1 --nofork"
+		  # Stored filename must be absolute as deamon chdir's
+		  ." --stored_filename=".getcwd()."/test_store/".hostname());
     check_server_up(6);  # (6 children: perl, sh, choose sh, choose, report sh, report)
     sleep 5;
 }
 
 ############
 
-# 2: Constructor
+# Constructor
 my $scheduler = new Schedule::Load::Schedule
     ( %Invoke_Params,
-      print_down=>sub { die "%Error: Can't locate sch server\n"
+      print_down=>sub { die "%Error: Can't locate slchooserd server\n"
 			    . "\tRun 'slchoosed &' before this test\n";
 		    }
       );
-ok ($scheduler);
+ok ($scheduler); #3
 
 print "print_hosts check\n";
 ok ($scheduler->print_hosts);
@@ -82,26 +87,26 @@ ok ($scheduler->print_hosts);
 print "print_classes check\n";
 ok ($scheduler->print_classes);
 
-# 5: Top processes
+print "top check\n";
 ok ($scheduler->print_top);
 
-# 6: Cpus
 print "cpus check\n";
 my $cpus = $scheduler->cpus;
 print "Total cpus in network: $cpus\n";
 ok ($cpus>0);
 
-# 7: Choose host, get this one
+# Choose host, get this one
 my @classes = $scheduler->classes();
 #testclass (@classes);
 testclass (['verilog']);
 ok(1);
 
-# 8: Check holds
+# Check holds
 print "loads check\n";
 ok(check_load());
 
-# 9: Release holds
+# Release holds
+print "hold release check\n";
 foreach (keys %Hold_Keys) {
     $scheduler->hold_release (hold_key=>$_);
     my $host = $Hold_Keys{$_};
@@ -110,21 +115,24 @@ foreach (keys %Hold_Keys) {
 }
 ok(1);
 
-# 10: Fixed loading
+# Fixed loading
+print "fixed load check\n";
 $scheduler->fixed_load (load=>10, pid=>$$);
 $Host_Load{hostname()} += 10;
 ok(1);
 
-# 11: Retrieve loading...
+# Retrieve loading...
+print "check load check\n";
 ok(check_load());
 
 # Establish reservation
+print "reservation check\n";
 $scheduler->reserve();
-
-# Release reservation
 $scheduler->release();
+ok(1);
 
-# 12: Commentary
+# Commentary
+print "comment check\n";
 $scheduler->cmnd_comment (pid=>$$, comment=>"test.pl_comment_check");
 $scheduler->fetch;
 print $scheduler->print_top() if $Debug;
@@ -133,6 +141,7 @@ print $scheduler->print_top() if $Debug;
 ok(1);
 
 ## 99: Destructor
+print "destruction check\n";
 undef $scheduler;
 ok(1);
 
@@ -145,7 +154,6 @@ print "This program's kill isn't always reliable\n";
 # Test subroutines
 
 sub check_load {
-
     $scheduler->fetch;	# Else cache will still have old loading
     foreach my $hostname (keys %Host_Load) {
 	my $host = $scheduler->get_host ($hostname);

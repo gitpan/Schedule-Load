@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Proc.pm -- Process information
-# $Id: Proc.pm,v 1.13 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Proc.pm,v 1.14 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -36,7 +36,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '1.8';
+$VERSION = '2.090';
 
 ######################################################################
 #### Globals

@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.20 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Schedule.pm,v 1.22 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -39,7 +39,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '1.8';
+$VERSION = '2.090';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -208,7 +208,7 @@ sub _scheduler_params {
 		      hold_time=> $self->{hold_time},
 		      hold_key=>  undef,
 		      hold_load=> 1,
-		      max_jobs=>  ($is_night ? -1  : 6 ),
+		      max_jobs=>  ($is_night ? -1  : -0.2 ),
 		      @_ };
     # Take a ref to list of classes and add class_ and any night time options
     # Return ref to hash with scheduler options: classes and is_night
@@ -369,8 +369,9 @@ Number of cpu loads the hold_key should reserve, defaults to one.
 
 =item max_jobs
 
-Maximum number of jobs that jobs() can return.  Defaults to 6 jobs during
-the day, unlimited at night.
+Maximum number of jobs that jobs() can return.  Negative fraction indicates
+that percentage of the clump, for example -0.5 will use 50% of free CPUs.
+Defaults to 20% of the free clump during the day, 100% at night.
 
 =item night_hours_cb
 

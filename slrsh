@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -w
-# $Id: slrsh,v 1.8 2002/03/18 14:43:19 wsnyder Exp $
+# $Id: slrsh,v 1.12 2002/07/28 21:42:41 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -39,9 +39,13 @@ $SIG{HUP}  = \&sig_quit;
 $SIG{ABRT} = \&sig_quit;
 $SIG{TERM} = \&sig_quit;
 
+autoflush STDOUT 1;
+autoflush STDERR 1;
+
 ######################################################################
 
 my @params = ();
+my @hosts = ();
 $Opt_Prefix = 1;
 
 Getopt::Long::config ("pass_through", "no_auto_abbrev");
@@ -49,21 +53,27 @@ if (!GetOptions (
 		 "help"		=> \&usage,
 		 "parallel!"	=> \$Opt_Parallel,
 		 "prefix!"	=> \$Opt_Prefix,
+		 "hosts=s"	=> sub {shift; push @hosts, shift;},
 		 "debug!"	=> \$Debug,
 		 "<>"		=> \&parameter,
 		 )) {
     &usage(); }
 push @params, @ARGV;
 
+# Choose hosts to execute on
 gather();  # -> %Host_Lists
+if ($#hosts<0) {
+    @hosts = set_hosts('ALL') if $#hosts<0;
+} else {
+    @hosts = set_hosts(@hosts);
+}
 
 my $param = join(' ',@params);
 if ($param) {
-    my @hosts = @{$Host_Lists{ALL}};
     print "Hosts: @hosts\n";
     cmd($param, @hosts);
 } else {
-    cmdloop();
+    cmdloop(@hosts);
 }
 
 ######################################################################
@@ -74,7 +84,7 @@ sub parameter {
 }
 
 sub usage {
-    print '$Id: slrsh,v 1.8 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
+    print '$Id: slrsh,v 1.12 2002/07/28 21:42:41 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -84,29 +94,59 @@ sub usage {
 
 sub gather {
     my @params = @_;
-
+    # Form %Host_List with each class specified.
     my $hosts = Schedule::Load::Hosts->fetch(@params);
 
+    my @classes = (sort ($hosts->classes()));
     foreach my $host ( @{$hosts->hosts} ){
 	push @{$Host_Lists{ALL}}, $host->hostname;
 	push @{$Host_Lists{uc $host->archname}}, $host->hostname;
 	push @{$Host_Lists{uc $host->osvers}}, $host->hostname;
+	foreach my $class (@classes) {
+	    if ($host->exists($class) && $host->get($class)) {
+		push @{$Host_Lists{uc $class}}, $host->hostname;
+	    }
+	}
     }
+}
+
+sub set_hosts {
+    my @in = shift;
+    # Set the list of hosts to specified list, expanding any lists
+    my @out;
+    foreach my $instr (@in) {
+	foreach my $inhost (split /(:|\s+)/, "$instr:") {
+	    if (defined $Host_Lists{$inhost}) {
+		push @out, @{$Host_Lists{$inhost}};
+	    } else {
+		push @out, $inhost if $inhost !~ /^\s*:?\s*$/;
+	    }
+	}
+    }
+    return @out;
 }
 
 ######################################################################
 
 sub cmdloop {
-
+    # Poll for commands and execute
+    my @hosts = @_;
     my $Term = new Term::ReadLine 'slrsh';
-    my @hosts = @{$Host_Lists{ALL}};
     print "Hosts: @hosts\n";
 
     print "Use 'hosts' to change host list, 'x' to exit.\n";
     while (1) {
 	my $line = $Term->readline("slrsh> ");
 	if ($line =~ /^\s*$/) {
-	} elsif ($line =~ /^\s*(hosts)\s*$/) {
+	} elsif ($line =~ /^\s*hosts\s+(\S.*)$/) {
+	    $line = $1;
+	    $line =~ s/^\s+//;
+	    $line =~ s/\s+$//;
+	    if ($line ne "") { # !NOP
+		@hosts = set_hosts($line);
+	    }
+	    print "Current Hosts: @hosts\n";
+	} elsif ($line =~ /^\s*hosts\s*$/) {
 	    for my $lname (sort (keys %Host_Lists)) {
 		my @lhosts = @{$Host_Lists{$lname}};
 		print "  Use '$lname' => @lhosts\n"; 
@@ -115,14 +155,8 @@ sub cmdloop {
 	    my $line = $Term->readline("what_hosts? ");
 	    $line =~ s/^\s+//;
 	    $line =~ s/\s+$//;
-	    if ($line eq "") { # NOP
-	    } elsif (defined $Host_Lists{$line}) {
-		@hosts = @{$Host_Lists{$line}};
-	    } else {
-		@hosts = ();
-		foreach my $h (split /(:|\s+)/, "$line:") {
-		    push @hosts, $h if $h !~ /^\s*:?\s*$/;
-		}
+	    if ($line ne "") { # !NOP
+		@hosts = set_hosts($line);
 	    }
 	    print "Current Hosts: @hosts\n";
 	} elsif ($line =~ /^\s*(quit|exit|q|x)\s*$/) {
@@ -265,6 +299,12 @@ will execute 4 commands:
 =item --help
 
 Displays this message and program version and exits.
+
+=item --hosts 
+
+Add a host to the list of hosts to be executed on, or add a list of colon
+separated hostnames or class aliases.  If not specified, the default is all
+hosts.
 
 =item --noprefix
 

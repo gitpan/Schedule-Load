@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.33 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Hosts.pm,v 1.37 2002/08/01 14:46:03 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -43,7 +43,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.8';
+$VERSION = '2.090';
 
 ######################################################################
 #### Globals
@@ -148,18 +148,22 @@ sub classes {
 
 sub cpus {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->classes()';
+    my %params = @_;
     # Return number of cpus for a given class
 
     $self->_fetch_if_unfetched;
     my $jobs = 0;
     foreach my $host ( @{$self->hosts} ){
-	$jobs += $host->cpus();
+	if ($host->classes_match ($params{classes})) {
+	    $jobs += $host->cpus();
+	}
     }
     return $jobs;
 }
 
 sub idle_host_names {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
+    my %params = @_;
     # Return idle hosts, potentially matching given classes
     # Roughly scaled so even powered hosts have even representation
 
@@ -167,6 +171,7 @@ sub idle_host_names {
     my @hnames;
     foreach my $host (values %{$self->{hosts}}) {
 	if ($host->exists('hostname') && $host->hostname
+	    && $host->classes_match ($params{classes})
 	    && !$host->reserved) {
 	    my $idleCpus = $host->cpus - $host->adj_load;
 	    for (my $c=0; $c<$idleCpus; $c++) {
@@ -432,6 +437,15 @@ sub _host_load {
 ######################################################################
 #### Utilities
 
+sub ping {
+    my $self = shift;
+    my @params = @_;
+    my $ok = eval {
+	$self->fetch(@params);
+    };
+    return $ok;
+}
+
 ######################################################################
 #### Package return
 1;
@@ -511,6 +525,10 @@ reference to a list.
 Returns a list of host cpu names which are presently idle.  Multiple
 free CPUs on a given host will result in that name being returned multiple
 times.
+
+=item ping
+
+Return true if the slchoosed server is up.
 
 =item get_host ($hostname)
 

@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.27 2002/03/18 14:43:22 wsnyder Exp $
+# $Id: Reporter.pm,v 1.32 2002/08/01 15:42:00 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -28,6 +28,7 @@ require Exporter;
 use Socket;
 use IO::Socket;
 use IO::Select;
+use POSIX;
 
 use Proc::ProcessTable;
 use Unix::Processors;
@@ -40,7 +41,7 @@ use Config;
 use strict;
 use vars qw($VERSION $Debug %User_Names %Pid_Inherit 
 	    @Pid_Time_Base @Pid_Time $Os_Linux
-	    $Distrust_Pctcpu);
+	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu);
 use Carp;
 
 ######################################################################
@@ -49,10 +50,11 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.8';
+$VERSION = '2.090';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
+$Divide_Pctcpu_By_Cpu = 0;   # Older linuxes may require this
 
 ######################################################################
 #### Globals
@@ -87,6 +89,7 @@ sub start {
 
     # More defaults (can't be above due to needing other elements)
     $self->{const}{hostname} ||= hostname();
+    $self->{const}{slreportd_hostname} ||= hostname();
     $self->{stored_filename} ||= ("/usr/local/lib/rschedule/slreportd_".$self->{const}{hostname}."_store");
 
     (defined $self->{dhost}) or croak 'Require a host parameter';
@@ -119,9 +122,27 @@ sub start {
 	# Wait for someone to become active
 	# or send a alive message every 60 secs (in case slchoosed goes down & up)
 	sleep($self->{alive_time}) if ($select->count() == 0); # select won't block if no fd's
+	my $inbuffer = '';
+      input:
 	foreach my $fh ($select->can_read ($self->{alive_time})) {
-	    #print "Servicing input\n" if $Debug;
-	    last if (!defined (my $line = <$fh>));
+	    print "Servicing input\n" if $Debug;
+
+	    # Snarf input
+	    my $data='';
+	    my $rv = $fh->recv($data, POSIX::BUFSIZ, 0);
+	    if (!defined $rv || (length $data == 0)) {
+		$inbuffer = '';
+		next input;
+	    }
+	    $inbuffer .= $data;
+
+	    my $line;
+	    if ($inbuffer =~ s/(.*?)\n//) {
+		$line = $1;
+	    } else {
+		next readchunk;
+	    }
+
 	    chomp $line;
 	    print "REQ $line\n" if $Debug;
 	    my ($cmd, $params) = _pthaw($line, $Debug);
@@ -314,13 +335,16 @@ sub _fill_dynamic {
 		# Can't calculate, as p->start is wrong (on linux).  We'll assume the
 		# pctcpu is ok.
 		#$pctcpu = $ustime / (1000*($sec-$p->start));
-		#printf "PIDSTART %d SINCESTART %d-%d=%d UTIME %d LOAD %f\n",
-		#$p->pid, $sec, $p->start, $sec-$p->start, $ustime, $pctcpu;
+		printf "PIDSTART %d SINCESTART %d-%d=%d UTIME %d LOAD %f\n"
+		    ,$p->pid, $sec, $p->start, $sec-$p->start, $ustime, $pctcpu
+		    if 0;
 	    } else {
 		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1]) * 1000)
-			       / $deltastamp / $self->{const}{cpus});
-		printf "PIDCONT %d CLOCK %d UTIME %d-%d=%d LOAD %f\n"
-		    ,$p->pid, $deltastamp,
+			       / $deltastamp
+			       );
+		$pctcpu /= $self->{const}{cpus} if $Divide_Pctcpu_By_Cpu;
+		printf "PIDCONT %d PCT %s CLOCK %d UTIME %d-%d=%d LOAD %f\n"
+		    ,$p->pid, $p->pctcpu||0, $deltastamp,
 		    ,$ustime, $Pid_Time[$p->pid][1], $ustime-$Pid_Time[$p->pid][1],
 		    ,$pctcpu if 0;
 	    }
@@ -550,7 +574,7 @@ The filename to store persistant items in, such as if this host is
 reserved.  Must be either local-per-machine, or have the hostname in it.
 Defaults to /usr/local/lib/rschedule/slreportd_{hostname}_store.  Set to
 undef to disable persistance (thus if the machine reboots the reservation
-is lost.)
+is lost.)   The path must be **ABSOLUTE** as the deamons do a chdir.
 
 =back
 

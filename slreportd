@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $
+# $Id: slreportd,v 1.22 2002/08/01 15:15:49 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -35,6 +35,8 @@ use strict;
 
 BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 
+$SIG{PIPE} = 'IGNORE';
+
 ######################################################################
 # configuration
 
@@ -63,7 +65,7 @@ if (!GetOptions (
 		 "fork!"	=> \$opt_fork,	# Debugging/Test script
 		 "fake!"	=> \$opt_fake,
 		 "port=i"	=> sub {shift; $server_params{port} = shift;},
-		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, split(':',shift);},
 		 "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
 		 "<>"		=> \&parameter,
 		 )) {
@@ -72,6 +74,11 @@ if (!GetOptions (
 
 autoflush STDOUT 1;
 autoflush STDERR 1;
+
+# We're chdiring to /, so make sure program name has path
+if ($0 !~ m!^/!) { $0 = getcwd()."/".$0; }
+chdir "/" if $opt_fork;	# Change immediately to aid debugging of $0 change
+
 if ($opt_quiet && !$Debug) {
     if ($opt_fork) {
 	# Fork once to let parent die
@@ -119,7 +126,9 @@ while (1) {
     sleep(1);
     # Restart this program by re-execing; allows users to restart the daemon
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-    exec $0, @Orig_ARGV if -r $0;
+    print "exec $0, @Orig_ARGV\n" if $Debug;
+    exec $0, @Orig_ARGV if -x $0;
+    # If can't exec we simply start the server again
 }
 
 exit (0);
@@ -129,6 +138,7 @@ exit (0);
 sub parameter {
     my $param = shift;
     if ($param =~ /^([a-zA-Z_0-9]+)=(.*)$/) {
+	$server_params{$1} = $2 if $1 eq "timeout" || $1 eq "alive_time";
 	$server_params{const}{$1} = $2;
     } else {
 	die "%Error: Unknown parameter: $param\n";
@@ -138,7 +148,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.22 2002/08/01 15:15:49 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -146,7 +156,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.22 2002/08/01 15:15:49 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -199,7 +209,8 @@ Specifies load management should not be used, for reporting of a "fake"
 hosts' status.  Often the hostname and other parameters will want to be
 overridden, for example:
 
-slreportd hostname=lab_1 cpus=1 max_clock=100 osname=myos osvers=1 archname=myarch reservable=1
+slreportd hostname=lab_1 cpus=1 max_clock=100 osname=myos osvers=1
+          archname=myarch reservable=1 load_limit=1
 
 =item --version
 Displays program version and exits.

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $
+# $Id: rschedule,v 1.24 2002/05/29 17:56:26 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -68,7 +68,7 @@ $result = &GetOptions (
 		       "debug"		=> \&debug,
 		       "version"	=> \&version,
 		       "port=i"		=> sub {shift; $server_params{port} = shift;},
-		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, split(':',shift);},
 		       "host=s"		=> \$opt_host,
 		       "class=s"	=> \@opt_classes,
 		       "load=i"		=> \$opt_fixed_load,
@@ -131,7 +131,7 @@ sub cmd {
     } elsif ($param eq "hosts") {
 	push @commands, sub { print $scheduler->print_hosts; };
     } elsif ($param eq "idle_host_names") {
-	push @commands, sub { print join(' ',$scheduler->idle_host_names),"\n"; };
+	push @commands, sub { print join(' ',$scheduler->idle_host_names(classes=>\@opt_classes,)),"\n"; };
     } elsif ($param eq "jobs") {
 	push @commands, sub { print $scheduler->jobs,"\n"; };
     } elsif ($param eq "loads") {
@@ -200,7 +200,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.24 2002/05/29 17:56:26 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -208,7 +208,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.24 2002/05/29 17:56:26 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
