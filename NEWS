@@ -6,6 +6,13 @@ The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
+* Changes in Schedule::Load 3.002 9/5/2003
+
+***	Added DELAY column in 'rschedule status' to show number of seconds
+	it is taking for a host to respond to a scheduler request.
+	This aids in debugging problems due to slow networks.
+
+
 * Changes in Schedule::Load 3.001 5/21/2003
 
 **	This is a major release to add support for scheduling of
@@ -144,7 +151,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.39 2003/05/21 18:00:44 wsnyder Exp $
+$Id: NEWS,v 1.41 2003/09/05 18:18:04 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

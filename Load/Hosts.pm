@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.56 2003/04/28 18:24:18 wsnyder Exp $
+# $Id: Hosts.pm,v 1.59 2003/09/05 18:18:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -42,7 +42,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.001';
+$VERSION = '3.002';
 
 ######################################################################
 #### Globals
@@ -329,8 +329,8 @@ sub print_status {
 		       $hosts->{chooinfo}{slchoosed_status});
     }
 
-    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-17s          %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DAEMON STATUS");
+    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-17s        %6s      %s\n") =~ s/\s\s+/ /g;
+    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DELAY", "DAEMON STATUS");
     foreach my $host ( @{$hosts->hosts} ){
 	my $t = localtime($host->slreportd_connect_time);
 	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
@@ -340,6 +340,7 @@ sub print_status {
 		       $host->adj_load, 
 		       $host->rating_text,
 		       $tm,
+		       (defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
 		       $host->slreportd_status,
 		       );
     }
@@ -425,8 +426,9 @@ sub print_classes {
 
     my @classes = (sort ($hosts->classes()));
     my $classnum = 0;
-    my %class_letter = ();
-    my @col_width = ();
+    my %class_letter;
+    my %class_numeric;
+    my @col_width;
     foreach my $class (@classes) {
 	$class_letter{$class} = chr($classnum%26+ord("a"));
 	$col_width[$classnum] = 1;
@@ -434,6 +436,7 @@ sub print_classes {
 	    my $val = $host->get_undef($class);
 	    if ($val) {
 		$col_width[$classnum] = length $val if $col_width[$classnum] < length $val;
+		$class_numeric{$class} = 1 if $val>1;
 	    }
 	}
 	$classnum++;
@@ -460,7 +463,7 @@ sub print_classes {
 	foreach my $class (@classes) {
 	    my $val = $host->get_undef($class);
 	    my $chr = ".";
-	    if ($val && $val > 1) {
+	    if ($val && ($val > 1 || $class_numeric{$class})) {
 		$chr = $val;
 	    } elsif ($val) {
 		$chr = $class_letter{$class};

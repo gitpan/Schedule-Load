@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.33 2003/05/08 20:17:15 wsnyder Exp $
+# $Id: Schedule.pm,v 1.35 2003/09/05 18:18:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -38,7 +38,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.001';
+$VERSION = '3.002';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -244,8 +244,8 @@ sub schedule {
 
 sub night_hours_p {
     # Return true if working hours
-    my $working = ((localtime->hour >= 6 && localtime->hour < 22)
-		   && (localtime->wday >= 1 && localtime->wday < 6));
+    my $working = ((localtime->hour >= 7 && localtime->hour < 22)
+		   && (localtime->wday >= 1 && localtime->wday < 6)); # M-F
     return !$working;
 }
 

@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.51 2003/05/07 23:58:16 wsnyder Exp $
+# $Id: Chooser.pm,v 1.53 2003/09/05 18:18:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -30,6 +30,7 @@ use IO::Select;
 use Tie::RefHash;
 use Net::hostent;
 use Sys::Hostname;
+use Time::HiRes qw (gettimeofday);
 BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
 
 use Schedule::Load qw (:_utils);
@@ -40,7 +41,7 @@ use IPC::PidStat;
 use strict;
 use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Select
 	    $Exister
-	    $Time $TimeStr
+	    $Time $Time_Usec $TimeStr
 	    $Server_Self %ChooInfo);
 use vars qw(%Holds);  # $Holds{hold_key}[listofholds] = HOLD {hostname=>, scheduled=>1,}
 use Carp;
@@ -51,7 +52,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.001';
+$VERSION = '3.002';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -62,7 +63,7 @@ use constant RECONNECT_NUMBER  => 5;
 %Clients = ();
 tie %Clients, 'Tie::RefHash';
 
-$Time = time();	# Cache the time
+cache_time();
 $TimeStr = _timelog();
 %ChooInfo = (# Information to pass to "rschedule info"
 	     slchoosed_hostname => hostname(),
@@ -106,7 +107,7 @@ sub start {
     while (1) {
 	# Anything to read?
 	foreach my $fh ($Select->can_read(3)) { #3 secs maximum
-	    $Time = time();	# Cache the time
+	    cache_time();	# Cache the time
 	    $TimeStr = _timelog() if $Debug;
 	    if ($fh == $server) {
 		# Accept a new connection
@@ -116,9 +117,11 @@ sub start {
 		$Select->add($clientfh);
 		my $flags = fcntl($clientfh, F_GETFL, 0) or die "%Error: Can't get flags";
 		fcntl($clientfh, F_SETFL, $flags | O_NONBLOCK) or die "%Error: Can't nonblock";
+		# new Client
 		my $client = {socket=>$clientfh,
 			      delayed=>0,
 			      ping => $Time,
+			      last_send_time => undef,
 			  };
 		$Clients{$clientfh} = $client;
 	    }
@@ -132,12 +135,17 @@ sub start {
 	}
 	# Action or timer expired, only do this if time passed
 	if (time() != $Time) {
-	    $Time = time();	# Cache the time
+	    cache_time();	# Cache the time
 	    $TimeStr = _timelog() if $Debug;
 	    _hold_timecheck();
 	    _client_ping_timecheck();
 	}
     }
+}
+
+sub cache_time {
+    # Cache the time, store in a variable to avoid a OS call inside a loop
+    ($Time, $Time_Usec) = gettimeofday();
 }
 
 ######################################################################
@@ -245,6 +253,11 @@ sub _client_service {
 	return;
     }
 
+    if ($client->{last_send_time} && $client->{host}) {
+	my $sec  = $Time - $client->{last_send_time}[0];
+	my $usec =  $Time_Usec - $client->{last_send_time}[1];
+	$client->{host}{const}{slreportd_delay} = $sec + $usec * 1.0e-6;
+    }
     $client->{inbuffer} .= $data;
     $client->{ping} = $Time;
 
@@ -306,6 +319,7 @@ sub _client_send {
 
     $SIG{PIPE} = 'IGNORE';
 
+    $client->{last_send_time} = [$Time, $Time_Usec];
     my $fh = $client->{socket};
     my $ok = Schedule::Load::Socket::send_and_check($fh, $out);
     if (!$ok) {
@@ -350,6 +364,7 @@ sub _host_start {
 
     $host->{const}{slreportd_connect_time} = time();
     $host->{const}{slreportd_status} = "Connected";
+    $host->{const}{slreportd_delay} = undef;
 
     # Remove any earlier connection
     my $oldhost = $Hosts->{hosts}{$hostname};

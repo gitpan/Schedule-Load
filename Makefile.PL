@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.15 2003/04/24 13:14:09 wsnyder Exp $
+# $Id: Makefile.PL,v 1.16 2003/08/22 15:17:19 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 
 require 5.005;
@@ -32,7 +32,7 @@ maintainer-dist: dist tag
 maintainer-clean: distclean
 	-rm README Makefile
 
-dist: distcheck
+dist: distcheck README
 ";
 }
 
