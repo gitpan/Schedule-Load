@@ -1,10 +1,10 @@
 #!/usr/local/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $
+# $Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -29,6 +29,7 @@ use Getopt::Long;
 use Pod::Text;
 use Sys::Syslog;
 use Schedule::Load::Reporter;
+use Schedule::Load::FakeReporter;
 use POSIX;
 use strict;
 
@@ -51,6 +52,7 @@ my $Debug = 0;
 my %server_params = ();
 my $opt_quiet = 1;
 my $opt_fork = 1;
+my $opt_fake = 0;
 
 Getopt::Long::config ("pass_through", "no_auto_abbrev");
 if (!GetOptions (
@@ -59,6 +61,7 @@ if (!GetOptions (
 		 "version"	=> \&version,
 		 "quiet!"	=> \$opt_quiet,	# Debugging
 		 "fork!"	=> \$opt_fork,	# Debugging/Test script
+		 "fake!"	=> \$opt_fake,
 		 "port=i"	=> sub {shift; $server_params{port} = shift;},
 		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
 		 "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
@@ -100,7 +103,11 @@ while (1) {
     }
     my $pid;
     if (!$opt_fork || (0==($pid = fork()))) {
-        Schedule::Load::Reporter->start (%server_params);
+	if ($opt_fake) {
+	    Schedule::Load::FakeReporter->start (%server_params);
+	} else {
+	    Schedule::Load::Reporter->start (%server_params);
+	}
 	exit(0);
     }
     die "%Error: Server aborted\n" if !$opt_fork;
@@ -131,7 +138,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -139,7 +146,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.17 2002/03/18 14:43:19 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -147,6 +154,7 @@ sub version {
 sub debug {
     $Debug = 1;
     $Schedule::Load::Reporter::Debug = 1;
+    $Schedule::Load::FakeReporter::Debug = 1;
 }
 
 ######################################################################
@@ -185,6 +193,13 @@ Specifies the port number that slchoosed uses.
 Specifies the daemon host name that slchoosed uses.  May be specified
 multiple times to specify backup hosts.  Defaults to SLCHOOSED_HOST
 environment variable, which contains colon separated host names.
+
+=item --fake
+Specifies load management should not be used, for reporting of a "fake"
+hosts' status.  Often the hostname and other parameters will want to be
+overridden, for example:
+
+slreportd hostname=lab_1 cpus=1 max_clock=100 osname=myos osvers=1 archname=myarch reservable=1
 
 =item --version
 Displays program version and exits.

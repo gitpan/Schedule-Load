@@ -1,8 +1,8 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.25 2001/12/06 18:14:45 wsnyder Exp $
+# $Id: Chooser.pm,v 1.27 2002/03/18 14:43:22 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.7';
+$VERSION = '1.8';
 
 ######################################################################
 #### Globals

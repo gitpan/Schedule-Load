@@ -1,8 +1,8 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.30 2001/12/06 18:14:45 wsnyder Exp $
+# $Id: Hosts.pm,v 1.33 2002/03/18 14:43:22 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -43,7 +43,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.7';
+$VERSION = '1.8';
 
 ######################################################################
 #### Globals
@@ -271,12 +271,17 @@ sub print_kills {
     my $hosts = shift;
     # Top processes
     my $out = "";
+    (my $FORMAT =           "ssh %-12s kill %6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
-	    $out.=sprintf ("ssh %s kill %s\n", 
+	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
+	    $out.=sprintf ($FORMAT, 
 			   $host->hostname,
 			   $p->pid, 
+			   $p->uname, 		$p->time_hhmm,
+			   sprintf("%3.1f", $p->pctcpu),
+			   $comment,
 			   );
 	}
     }
@@ -331,6 +336,7 @@ sub cmnd_comment {
     my $params = {
 	host=>hostname(),
 	comment=>undef,
+	uid=>$<,
 	pid=>$$,
 	@_,};
 

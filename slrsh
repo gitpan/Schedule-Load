@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl -w
-# $Id: slrsh,v 1.4 2001/11/06 22:59:13 wsnyder Exp $
+# $Id: slrsh,v 1.8 2002/03/18 14:43:19 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -22,32 +22,46 @@
 
 require 5.005;
 use IO::File;
+use IO::Pipe;
 use Pod::Text;
 use Getopt::Long;
+use POSIX ":sys_wait_h";
 use Term::ReadLine;
+
 use Schedule::Load::Hosts;
 use strict;
-use vars qw ($Debug @Hosts);
+use vars qw ($Debug %Pids $Child $Opt_Parallel $Opt_Prefix %Host_Lists);
 
 ######################################################################
+
+$SIG{INT}  = \&sig_quit;
+$SIG{HUP}  = \&sig_quit;
+$SIG{ABRT} = \&sig_quit;
+$SIG{TERM} = \&sig_quit;
 
 ######################################################################
 
 my @params = ();
+$Opt_Prefix = 1;
 
 Getopt::Long::config ("pass_through", "no_auto_abbrev");
 if (!GetOptions (
 		 "help"		=> \&usage,
+		 "parallel!"	=> \$Opt_Parallel,
+		 "prefix!"	=> \$Opt_Prefix,
 		 "debug!"	=> \$Debug,
 		 "<>"		=> \&parameter,
 		 )) {
     &usage(); }
 push @params, @ARGV;
 
-gather();
+gather();  # -> %Host_Lists
+
 my $param = join(' ',@params);
 if ($param) {
-    cmd($param);
+    my @hosts = @{$Host_Lists{ALL}};
+    print "Hosts: @hosts\n";
+    cmd($param, @hosts);
 } else {
     cmdloop();
 }
@@ -60,7 +74,7 @@ sub parameter {
 }
 
 sub usage {
-    print '$Id: slrsh,v 1.4 2001/11/06 22:59:13 wsnyder Exp $ ', "\n";
+    print '$Id: slrsh,v 1.8 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -73,50 +87,133 @@ sub gather {
 
     my $hosts = Schedule::Load::Hosts->fetch(@params);
 
-    my @hostnames = ();
     foreach my $host ( @{$hosts->hosts} ){
-	push @hostnames, $host->hostname;
+	push @{$Host_Lists{ALL}}, $host->hostname;
+	push @{$Host_Lists{uc $host->archname}}, $host->hostname;
+	push @{$Host_Lists{uc $host->osvers}}, $host->hostname;
     }
-
-    print "Hosts: @hostnames\n";
-
-    @Hosts = @hostnames;
 }
 
 ######################################################################
 
-sub cmd {
-    my $cmd = shift;
-    foreach my $host (@Hosts) {
-	my @hosts = ($host);
-	@hosts = @Hosts if $cmd =~ /\@HOSTS(?![a-z0-9A-Z_])/;
-	foreach my $subhost (@hosts) {
-	    my $hcmd = $cmd;
-	    $hcmd =~ s/\@HOSTS?(?![a-z0-9A-Z_])/$subhost/mg;
-	    print "\n$host: $hcmd\n";
-	    system ("ssh",$host,$hcmd);
-	}
-    }
-}
-
 sub cmdloop {
 
     my $Term = new Term::ReadLine 'slrsh';
+    my @hosts = @{$Host_Lists{ALL}};
+    print "Hosts: @hosts\n";
 
+    print "Use 'hosts' to change host list, 'x' to exit.\n";
     while (1) {
 	my $line = $Term->readline("slrsh> ");
 	if ($line =~ /^\s*$/) {
 	} elsif ($line =~ /^\s*(hosts)\s*$/) {
-	    print "Current Hosts: @Hosts\n";
-	    my $line = $Term->readline("what_hosts? ");
-	    @Hosts = ();
-	    foreach my $h (split /(:|\s+)/, "$line:") {
-		push @Hosts, $h if $h !~ /^\s*:?\s*$/;
+	    for my $lname (sort (keys %Host_Lists)) {
+		my @lhosts = @{$Host_Lists{$lname}};
+		print "  Use '$lname' => @lhosts\n"; 
 	    }
+	    print "Current Hosts: @hosts\n";
+	    my $line = $Term->readline("what_hosts? ");
+	    $line =~ s/^\s+//;
+	    $line =~ s/\s+$//;
+	    if ($line eq "") { # NOP
+	    } elsif (defined $Host_Lists{$line}) {
+		@hosts = @{$Host_Lists{$line}};
+	    } else {
+		@hosts = ();
+		foreach my $h (split /(:|\s+)/, "$line:") {
+		    push @hosts, $h if $h !~ /^\s*:?\s*$/;
+		}
+	    }
+	    print "Current Hosts: @hosts\n";
 	} elsif ($line =~ /^\s*(quit|exit|q|x)\s*$/) {
 	    exit (0);
 	} else {
-	    cmd($line);
+	    cmd($line, @hosts);
+	}
+    }
+}
+
+sub form_cmds {
+    my $usrcmd = shift;
+    my @hosts = @_;
+    # Pass command and list of hosts, return list of all commands to execute
+    my @cmds = ();
+    # Execute command on each host in list.
+    foreach my $host (@hosts) {
+	my @eachhosts = ($host);
+	@eachhosts = @hosts if $usrcmd =~ /\@HOSTS(?![a-z0-9A-Z_])/;
+	foreach my $subhost (@eachhosts) {
+	    my $hcmd = $usrcmd;
+	    $hcmd =~ s/\@HOSTS?(?![a-z0-9A-Z_])/$subhost/mg;
+	    push @cmds, {host=>$host, cmd=>$hcmd};
+	}
+    }
+    return @cmds;
+}
+
+sub cmd {
+    my $usrcmd = shift;
+    my @hosts = @_;
+    # Execute command on each host in list.
+    if ($Opt_Parallel) {
+	backgnd_cmd ($usrcmd, @hosts);
+	return;
+    }
+
+    my @cmds = form_cmds($usrcmd,@hosts);
+    foreach my $cmdref (@cmds) {
+	print "\n",$cmdref->{host},": ",$cmdref->{cmd},"\n";
+	system ("ssh",$cmdref->{host},$cmdref->{cmd});
+    }
+}
+
+######################################################################
+
+sub sig_quit {
+    # Ctrl-C, kill all processes we spawned
+    exit(1) if $Child;
+    #warn "FIX THIS!\n";
+    die "Quit\n";
+}
+
+sub backgnd_cmd {
+    my $usrcmd = shift;
+    my @hosts = @_;
+
+    # Prevent DISPLAY use via ssh
+    delete $ENV{DISPLAY};
+
+    # Execute command on each host in list.
+    my @cmds = form_cmds($usrcmd,@hosts);
+    foreach my $cmdref (@cmds) {
+	my $fh = new IO::Handle;
+	my $pid = open(*{$fh}, "-|");
+	die "Can't fork: $!" unless defined $pid;
+	$cmdref->{pid} = $pid;
+	$cmdref->{pipe} = $fh;
+	print "FORK $pid ",$cmdref->{pipe}," at ",$cmdref->{host},"\n" if $Debug;
+	if ($pid) { # Parent
+	}
+	else { # Child
+	    $Child = 1;
+	    exec 'ssh', $cmdref->{host}, $cmdref->{cmd};
+	    die "Can't exec ssh";
+	}
+    }
+
+    # Grab output from each host
+    while ($#cmds >= 0) {
+	my $cnum = 0;
+	foreach my $cmdref (@cmds) {
+	    my $pipe = $cmdref->{pipe};
+	    while (defined(my $line = $pipe->getline())) {
+		print "$cmdref->{host}: " if ($Opt_Prefix);
+		print "$line";
+	    }
+	    if ($pipe->eof) {
+		splice @cmds, $cnum, 1;
+	    }
+	    $cnum++;
 	}
     }
 }
@@ -168,6 +265,17 @@ will execute 4 commands:
 =item --help
 
 Displays this message and program version and exits.
+
+=item --noprefix
+
+Disable the default printing of the hostname in front of all --parallel
+output.
+
+=item --parallel
+
+Run each command on all machines in parallel.  The command cannot
+require any input.  The name of the machine will be prefixed to all
+output unless --noprefix is used.
 
 =back
 

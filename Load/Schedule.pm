@@ -1,8 +1,8 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.17 2001/12/06 18:14:45 wsnyder Exp $
+# $Id: Schedule.pm,v 1.20 2002/03/18 14:43:22 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -39,7 +39,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '1.7';
+$VERSION = '1.8';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -92,6 +92,7 @@ sub reserve {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->reserve)';
     my $params = {
 	host=>hostname(),
+	uid=>$<,
 	comment=>$self->reserve_default_comment(),
 	@_,};
 
@@ -141,6 +142,7 @@ sub fixed_load {
     my $params = {
 	host=>hostname(),
 	load=>1,
+	uid=>$<,
 	pid=>$$,
 	@_,};
 

@@ -1,9 +1,9 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $
+# $Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -200,7 +200,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -208,7 +208,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.22 2002/03/18 14:43:19 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

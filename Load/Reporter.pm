@@ -1,8 +1,8 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.24 2001/12/06 18:14:45 wsnyder Exp $
+# $Id: Reporter.pm,v 1.27 2002/03/18 14:43:22 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.7';
+$VERSION = '1.8';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -79,19 +79,22 @@ sub start {
     my $self = {
 	%Schedule::Load::_Default_Params,
 	#Documented
-	stored_filename=>("/usr/local/lib/rschedule/slreportd_".hostname()."_store"),
 	#Undocumented
 	timeout=>$Debug?2:30,		# Sec before host socket connect times out
 	alive_time=>$Debug?10:30,	# Sec to send alive message
 	@_};
     bless $self, $class;
 
+    # More defaults (can't be above due to needing other elements)
+    $self->{const}{hostname} ||= hostname();
+    $self->{stored_filename} ||= ("/usr/local/lib/rschedule/slreportd_".$self->{const}{hostname}."_store");
+
     (defined $self->{dhost}) or croak 'Require a host parameter';
     #foreach (@{$self->{dhost}}) { print "Host $_\n"; }
 
     my $select = IO::Select->new();
 
-    $self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 ); 
+    $self->pt();	# Create process table
 
     # Load constants
     $self->_fill_const;
@@ -140,6 +143,18 @@ sub start {
 	    }
 	}
     }
+}
+
+######################################################################
+######################################################################
+#### Accessors
+
+sub pt {
+    my $self = shift;
+    if (!$self->{pt}) {
+	$self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 ); 
+    }
+    return $self->{pt};
 }
 
 ######################################################################
@@ -200,18 +215,17 @@ sub _fill_const {
     # (Values that don't change with loading -- known at startup)
  
     # Load our required keys
-    $self->{const}{hostname}  = hostname();
-    $self->{const}{cpus}      = Unix::Processors->max_online();
-    $self->{const}{max_clock} = Unix::Processors->max_clock();
-    $self->{const}{osname}    = $Config{osname};
-    $self->{const}{osvers}    = $Config{osvers};
-    $self->{const}{archname}  = $Config{archname};
+    $self->{const}{cpus}      ||= Unix::Processors->max_online();
+    $self->{const}{max_clock} ||= Unix::Processors->max_clock();
+    $self->{const}{osname}    ||= $Config{osname};
+    $self->{const}{osvers}    ||= $Config{osvers};
+    $self->{const}{archname}  ||= $Config{archname};
     foreach my $field (qw(reservable)) {
 	$self->{const}{$field} = 0 if !defined $self->{const}{$field};
     }
 
     # Look for some special processes (assume init makes them)
-    foreach my $p (@{$self->{pt}->table}) {
+    foreach my $p (@{$self->pt->table}) {
 	if ($p->fname eq "nicercizerd") {
 	    $self->{const}{nicercizerd} = 1;
 	}
@@ -278,7 +292,7 @@ sub _fill_dynamic {
     @Pid_Time_Base = ($sec,$usec);
 
     # Note the $p refs cannot be cached, they change when a new table call occurs
-    my $pidlist = $self->{pt}->table;
+    my $pidlist = $self->pt->table;
 
     my %pidinfo = ();
 
@@ -294,7 +308,8 @@ sub _fill_dynamic {
 	$pctcpu = 0 if ($pctcpu eq "inf");	# Linux
 	if ($Distrust_Pctcpu) {
 	    my $ustime = ($p->utime+$p->stime);
-	    if (!defined $Pid_Time[$p->pid]
+	    if (!$ustime
+		|| !defined $Pid_Time[$p->pid]
 		|| $p->start != $Pid_Time[$p->pid][0]) {
 		# Can't calculate, as p->start is wrong (on linux).  We'll assume the
 		# pctcpu is ok.
@@ -398,6 +413,10 @@ sub _fixed_load {
     my $pid = $params->{pid};
     print "Fixed load of $load PID $pid\n" if $Debug;
     $Pid_Inherit{$pid}{fixed_load} = $load;
+    $Pid_Inherit{$pid}{uid} = $params->{uid};
+    if ($load==0) {
+	delete $Pid_Inherit{$pid};
+    }
 }
 
 sub _comment {
@@ -408,6 +427,7 @@ sub _comment {
     my $pid = $params->{pid};
     print "Command Commentary '$cmndcomment' PID $pid\n" if $Debug;
     $Pid_Inherit{$pid}{cmndcomment} = $cmndcomment;
+    $Pid_Inherit{$pid}{uid} = $params->{uid};
 }
 
 ######################################################################

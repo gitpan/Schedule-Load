@@ -1,15 +1,25 @@
 Schedule::Load NEWS --  history of user-visible changes.
-Copyright (C) 2000 Wilson Snyder.
+Copyright (C) 2002 Wilson Snyder.
 See the end for copying conditions.
 
 The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-* Changes in Schedule::Load 1.7 ****/2001
+* Changes in Schedule::Load 1.8 3/18/2002
+
+**	Added fake reporting hosts, for management of non-local hosts.
+
+***	Added --parallel option to slrsh
+
+***	Added additional host command options to slrsh
+
+
+* Changes in Schedule::Load 1.7 12/11/2001
 
 ***	Greatly improved chooser reliability when processes talking to it
 	CTRL-C or otherwise go bonkers.
+
 
 * Changes in Schedule::Load 1.6 11/28/2001
 
@@ -58,11 +68,11 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.14 2001/12/06 18:14:42 wsnyder Exp $
+$Id: NEWS,v 1.18 2002/03/18 14:43:19 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 
-Copyright (C) 2000 Wilson Snyder
+Copyright (C) 2002 Wilson Snyder
 
    See the README file included with this file for licencing information.
 

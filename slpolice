@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $
+# $Id: slpolice,v 1.13 2002/03/18 14:43:19 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2000 by Wilson Snyder.
+# This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
@@ -55,7 +55,7 @@ complain();
 ######################################################################
 
 sub usage {
-    print '$Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.13 2002/03/18 14:43:19 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -63,7 +63,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $ ';
+    print 'Id: $Id: slpolice,v 1.13 2002/03/18 14:43:19 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
