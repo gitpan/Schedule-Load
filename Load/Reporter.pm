@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.12 2000/01/21 14:31:09 wsnyder Exp $
+# $Id: Reporter.pm,v 1.15 2000/11/03 20:53:32 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -46,7 +46,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.2';
+$VERSION = '1.3';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 
@@ -85,7 +85,7 @@ sub start {
     (defined $self->{dhost}) or croak 'Require a host parameter';
     #foreach (@{$self->{dhost}}) { print "Host $_\n"; }
 
-    my $select = IO::Select->new(\*STDIN);	# Stdin required to have can_read block
+    my $select = IO::Select->new();
 
     $self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 ); 
 
@@ -110,10 +110,10 @@ sub start {
 
 	# Wait for someone to become active
 	# or send a alive message every 60 secs (in case slchoosed goes down & up)
+	sleep($self->{alive_time}) if ($select->count() == 0); # select won't block if no fd's
 	foreach my $fh ($select->can_read ($self->{alive_time})) {
 	    #print "Servicing input\n" if $Debug;
 	    last if (!defined (my $line = <$fh>));
-	    next if ($fh eq \*STDIN);
 	    chomp $line;
 	    print "REQ $line\n" if $Debug;
 	    my ($cmd, $params) = _pthaw($line, $Debug);
@@ -476,7 +476,8 @@ host is only used if the first is down, and so on down the list.
 
 =item port
 
-The port number of slchoosed.  Defaults to 1752.
+The port number of slchoosed.  Defaults to 'slchoosed' looked up via
+/etc/services, else 1752.
 
 =item min_pctcpu
 

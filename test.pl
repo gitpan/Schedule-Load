@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.11 2000/01/26 19:50:27 wsnyder Exp $
+#$Id: test.pl,v 1.13 2000/11/03 21:24:58 wsnyder Exp $
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
 
@@ -28,6 +28,10 @@ use Schedule::Load::Schedule;
 $loaded = 1;
 print "ok 1\n";
 
+if ($Schedule::Load::_Default_Params{port} =~ /^\d$/) {
+    print "%Note: You do not have slchoosed in /etc/services, may want to add\nslchoosed\t1752/tcp\t\t\t# Schedule::Load\n\n";
+}
+
 ######################### End of black magic.
 
 %Host_Load = ();  # min loading on each host
@@ -53,7 +57,7 @@ mkdir ('test_store', 0777);
 if (1) {
     start_server ("./slchoosed");
     sleep 1;
-    start_server ("./slreportd class_verilog=1 reservable=1 stored_filename=./test_store");
+    start_server ("./slreportd class_verilog=1 reservable=1 --stored_filename=./test_store/".hostname());
     check_server_up(8);  # 2*(4 children: perl, sh, daemon master, daemon slave)
     sleep 5;
 }

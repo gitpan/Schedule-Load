@@ -6,6 +6,14 @@ The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
+* Changes in Schedule::Load 1.3 11/03/2000
+
+**	The port number now comes from a lookup of slchoosed in /etc/services
+	else uses 1752 if not found.
+
+****	Fixed Linux bug causing high CPU usage (blocking read didn't block).
+
+
 * Changes in Schedule::Load 1.2 1/21/2000
 
 ****	test.pl improvements: check for free port, use test store directory.
@@ -16,7 +24,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.2 2000/01/21 13:58:30 wsnyder Exp $
+$Id: NEWS,v 1.5 2000/11/03 20:53:27 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

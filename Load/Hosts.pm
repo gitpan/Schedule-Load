@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.16 2000/01/21 14:31:09 wsnyder Exp $
+# $Id: Hosts.pm,v 1.18 2000/11/03 20:53:32 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -44,7 +44,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.2';
+$VERSION = '1.3';
 
 ######################################################################
 #### Globals
@@ -508,7 +508,8 @@ host is only used if the first is down, and so on down the list.
 
 =item port
 
-The port number of slchoosed.  Defaults to 1752.
+The port number of slchoosed.  Defaults to 'slchoosed' looked up via
+/etc/services, else 1752.
 
 =back
 

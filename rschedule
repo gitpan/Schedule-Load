@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.15 2000/01/21 14:31:03 wsnyder Exp $
+# $Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -183,7 +183,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.15 2000/01/21 14:31:03 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -191,7 +191,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.15 2000/01/21 14:31:03 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -288,16 +288,17 @@ Sets the hostname to allow the specified class of jobs.
 
 Sets the hostname to deny the specified class of jobs.
 
-=item reserve hostname
+=item reserve
 
 Reserves a host for dedicated use.  To be reservable the C<reservable> flag
 must be set when that host's C<slreportd> is invocated.  This is indicated
 on the top report by a "R" in the column next to the command.  To override
 a existing reservation you need to release the reservation first.
+Use --host to specify whish host.
 
-=item release hostname
+=item release
 
-Releases a host from dedicated use.
+Releases a host from dedicated use.  Use --host to specify whish host.
 
 =item best
 

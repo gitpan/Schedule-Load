@@ -1,8 +1,7 @@
 #!/usr/local/bin/perl -w
-# Bug in File::Find that ProcessTable uses.
-#!/usr/local/bin/perl -Tw
 # slreportd - load reporting deamon for perl Schedule::Load
-# $Id: slreportd,v 1.6 2000/01/21 14:31:04 wsnyder Exp $
+# Note: adding -T taint checks will break the storable feature
+# $Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -55,6 +54,7 @@ $result = &GetOptions (
 		       "quiet!"		=> \$opt_quiet,	# Debugging
 		       "port=i"		=> sub {shift; $server_params{port} = shift;},
 		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		       "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
 		       "<>"		=> \&parameter,
 		       );
 
@@ -99,7 +99,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.6 2000/01/21 14:31:04 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -107,7 +107,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.6 2000/01/21 14:31:04 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
