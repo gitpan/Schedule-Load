@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -Tw
 # slchoosed - choosing deamon for perl Schedule::Load
-# $Id: slchoosed,v 1.7 2000/01/21 14:31:04 wsnyder Exp $
+# $Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -56,6 +56,8 @@ $result = &GetOptions (
 
 if (!$result) { &usage(); }
 
+autoflush STDOUT 1;
+autoflush STDERR 1;
 if ($opt_quiet && !$Debug) {
     # Silence please (in case user didn't pipe when starting us)
     open(STDOUT, "/dev/null");
@@ -86,7 +88,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.7 2000/01/21 14:31:04 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -94,7 +96,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.7 2000/01/21 14:31:04 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -102,6 +104,7 @@ sub version {
 sub debug {
     $Debug = 1;
     $Schedule::Load::Chooser::Debug = 1;
+    $Schedule::Load::Schedule::Debug = 1;
 }
 
 ######################################################################
@@ -118,6 +121,7 @@ slchoosed - Distributed load chooser for perl Schedule::Load
 B<slchoosed>
 [ B<--help> ]
 [ B<--port=>I<port> ]
+[ B<--dhost=>I<host> ]
 [ B<--version> ]
 
 =head1 DESCRIPTION
@@ -134,6 +138,14 @@ Displays this message and program version and exits.
 
 =item --port
 Specifies the port number that slchoosed uses.
+
+=item --dhost
+Specifies the deamon host name that slchoosed uses.  May be specified
+multiple times to specify backup hosts.  Defaults to SLCHOOSED_HOST
+environment variable, which contains colon separated host names.  When
+slchoosed starts, any hosts listed AFTER the current host are assumed to be
+backup hosts, and are sent a reset so that this host may takeover the
+choosing task.
 
 =item --version
 Displays program version and exits.

@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.38 2000/11/03 20:53:26 wsnyder Exp $
+# $Id: Load.pm,v 1.41 2000/12/01 21:36:11 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -44,7 +44,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 $Debug = 0;
 
 %_Default_Params = (
@@ -120,6 +120,49 @@ sub _pthaw {
     return ($cmd, $ref);
 }
 
+######################################################################
+######################################################################
+######################################################################
+#### Internal socket class, so we can override NEW
+
+package Schedule::Load::Socket;
+use IO::Socket;
+
+use strict;
+use vars qw(@ISA);
+@ISA = qw(IO::Socket::INET);
+
+sub new {
+    my $class = shift;
+
+    my %params = (@_);
+    # There is a bug in the socket that it requires untainted peer address
+    # it will just silently fail if you give it a tainted host name
+    if ($params{PeerAddr}) {
+	$params{PeerAddr} =~ /([a-z0-9A-Z._-]*)/; $params{PeerAddr}=$1;	# Untaint
+    }
+    if ($params{PeerPort}) {
+	$params{PeerPort} =~ /([a-z0-9A-Z._-]*)/; $params{PeerPort}=$1;	# Untaint
+    }
+
+    my $fh;
+    {
+	local $SIG{__WARN__} = sub {
+	    return if $_[0] =~ /Connection refused/;
+	    warn @_;
+	};
+	$fh = $class->SUPER::new(
+				 Proto => 'tcp',
+				 %params);
+    }
+    $fh = undef if $?;
+    return $fh;
+}
+
+package Schedule::Load;
+
+######################################################################
+######################################################################
 ######################################################################
 #### Package return
 1;

@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.15 2000/11/03 20:53:31 wsnyder Exp $
+# $Id: Chooser.pm,v 1.19 2000/12/01 21:36:25 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -30,6 +30,8 @@ use Socket;
 use IO::Socket;
 use IO::Select;
 use Tie::RefHash;
+use Net::hostent;
+use Sys::Hostname;
 
 use Schedule::Load qw (:_utils);
 use Schedule::Load::Schedule;
@@ -47,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 
 ######################################################################
 #### Globals
@@ -83,10 +85,10 @@ sub start {
 					Reuse     => 1)
 	or die "$0: Error, socket: $!";
 
-    $SIG{ALRM} = \&sig_alarm;
-
     $Select = IO::Select->new($server);
     $Hosts = Schedule::Load::Schedule->new(_fetched=>-1,);  #Mark as always fetched
+
+    $self->_probe_reset();
 
     while (1) {
 	# Anything to read?
@@ -118,6 +120,57 @@ sub start {
 	    $TimeStr = _timelog() if $Debug;
 	    _hold_timecheck();
 	    _client_ping_timecheck();
+	}
+    }
+}
+
+######################################################################
+#### Host probing
+
+sub _probe_init {
+    my $self = shift;
+    # Create list of all hosts "below" this one on the list of all slchoosed servers
+
+    my @hostlist = ($self->{dhost});
+    @hostlist = @{$self->{dhost}} if (ref($self->{dhost}) eq "ARRAY");
+    my $host_this = gethost(hostname());
+
+    my $hit = 0;
+    my @subhosts;
+    foreach my $host (@hostlist) {
+	my $hostx = $host;
+	if (my $h = gethost($host)) {
+	    print "_probe_init (host $host => ",$host_this->name,")\n" if $Debug;
+	    if (lc($h->name) eq lc($host_this->name)) {
+		$hit = 1;
+	    } elsif ($hit) {
+		push @subhosts, $host;
+	    }
+	}
+    }
+    print "_probe_init subhosts= (@subhosts)\n" if $Debug;
+    $self->{_subhosts} = \@subhosts;
+}
+
+sub _probe_reset {
+    my $self = shift;
+
+    # Tell all subserviant hosts that a new master is on the scene.
+    # Start at top and work down, want to ignore ourself and everyone
+    # before ourself.
+    $self->_probe_init();
+    foreach my $host (@{$self->{_subhosts}}) {
+	print "_probe_reset $host $self->{port} trying...\n" if $Debug;
+	my $fhreset = Schedule::Load::Socket->new (
+					     PeerAddr  => $host,
+					     PeerPort  => $self->{port},
+					     Timeout   => $self->{timeout},
+					     );
+	if ($fhreset) {
+	    print "_probe_reset $host restarting\n" if $Debug;
+	    print $fhreset _pfreeze("chooser_restart", {}, $Debug);
+	    $fhreset->close();
+	    print "_probe_reset $host DONE\n" if $Debug;
 	}
     }
 }
@@ -210,8 +263,7 @@ sub _client_service {
 	}
 	# User reset
 	elsif ($cmd eq "report_restart") {
-	    my $keysref = $Hosts->hosts;
-	    _user_to_reporter ($client, $keysref, "report_restart\n");
+	    _user_to_reporter ($client, '-all', "report_restart\n");
 	    _client_done ($client);
 	} elsif ($cmd eq "chooser_restart") {
 	    # Overall fork loop will deal with it.
@@ -312,8 +364,16 @@ sub _host_dynamic {
 
 sub _user_to_reporter {
     my $userclient = shift;
-    my $hostnames = shift;
+    my $hostnames = shift;	# array ref, or '-all'
     my $cmd = shift;
+
+    if ($hostnames eq '-all') {
+	my @hostnames = ();
+	foreach my $host ($Hosts->hosts) {
+	    push @hostnames, $host->hostname;
+	}
+	$hostnames = \@hostnames;
+    }
 
     foreach my $hostname (@{$hostnames}) {
 	my $host = $Hosts->{hosts}{$hostname};
@@ -462,7 +522,8 @@ sub _schedule {
 	     || $host->classes_match ($schparams->{classes}))
 	    && !$host->reserved) {
 	    my $rating = $host->rating;
-	    #print "Test host $host rate $rating\n" if $Debug;
+	    #print "Test host ", $host->hostname," rate $rating\n" if $Debug;
+	    #print Data::Dumper->Dump([$host], ['host']),"\n" if $Debug;
 	    if ($rating > 0) {
 		my $machjobs = ($host->cpus - $host->adj_load);
 		$machjobs = 0 if ($machjobs < 0);

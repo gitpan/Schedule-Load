@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.15 2000/11/03 20:53:32 wsnyder Exp $
+# $Id: Reporter.pm,v 1.18 2000/12/01 21:36:44 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -46,7 +46,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 
@@ -147,13 +147,12 @@ sub _open_host {
     # Open a socket to the given host return true if successful
     
     print "Trying host $host $self->{port}\n" if $Debug;
-    $host =~ /([a-z0-9A-Z._-]*)/; $host=$1;	# Untaint
-    eval 'my $fh = IO::Socket::INET->new (Proto     => "tcp",
-				          PeerAddr  => $host,
-				          PeerPort  => $self->{port},
-				          Timeout   => $self->{timeout},
+    my $fh = Schedule::Load::Socket->new(
+					 PeerAddr  => $host,
+					 PeerPort  => $self->{port},
+					 Timeout   => $self->{timeout},
 				         );
-          $self->{socket} = $fh;';
+    $self->{socket} = $fh;
     if ($self->{socket}) {
 	# Send constants to the host, that will tell it we live
 	$self->_send_hash('const');
@@ -427,6 +426,7 @@ sub _set_stored {
     if (defined $self->{stored_filename}) {
 	print "Store $self->{stored_filename}\n" if $Debug;
 	nstore $self->{stored}, $self->{stored_filename};
+	chmod 0666, $self->{stored_filename};
     }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 # slreportd - load reporting deamon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $
+# $Id: slreportd,v 1.9 2000/11/30 18:11:25 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -60,6 +60,8 @@ $result = &GetOptions (
 
 if (!$result) { &usage(); }
 
+autoflush STDOUT 1;
+autoflush STDERR 1;
 if ($opt_quiet && !$Debug) {
     # Silence please (in case user didn't pipe when starting us)
     open(STDOUT, "/dev/null");
@@ -99,7 +101,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.9 2000/11/30 18:11:25 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -107,7 +109,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.8 2000/11/03 21:25:09 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.9 2000/11/30 18:11:25 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -161,6 +163,13 @@ Displays program version and exits.
 Sets a arbitary constant variable to the specified value.  This variable
 may be used so that a process requesting a machine can choose a machine
 with specific properties.
+
+=over 4 
+
+=item load_limit={value}
+Set a maximum number of jobs that the scheduler can run on this machine.
+
+=back
 
 =back
 

@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.18 2000/11/03 20:53:32 wsnyder Exp $
+# $Id: Hosts.pm,v 1.21 2000/12/01 21:36:59 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -26,7 +26,6 @@ require Exporter;
 @ISA = qw(Exporter);
 
 use Socket;
-use IO::Socket;
 
 use Schedule::Load qw(:_utils);
 use Schedule::Load::Hosts::Host;
@@ -44,7 +43,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 
 ######################################################################
 #### Globals
@@ -317,10 +316,10 @@ sub _open {
     my $fh;
     foreach my $host (@hostlist) {
 	print "Trying host $host\n" if $Debug;
-	$fh = IO::Socket::INET->new( Proto     => "tcp",
-				     PeerAddr  => $host,
-				     PeerPort  => $self->{port},
-				     );
+	$fh = Schedule::Load::Socket->new(
+					  PeerAddr  => $host,
+					  PeerPort  => $self->{port},
+					  );
 	if ($fh) {
 	    print "Opened $host\n" if $Debug;
 	    last;
