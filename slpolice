@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $
+# $Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -55,7 +55,7 @@ complain();
 ######################################################################
 
 sub usage {
-    print '$Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -63,7 +63,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $ ';
+    print 'Id: $Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -230,11 +230,11 @@ setgid root and renices a job to 19.  This comes with C<nicercizerd>.
 This package is distributed via CPAN.
 
 C<Nicercizerd> is available from
-C<http://www.ultranet.com/~wsnyder/veripool>.
+C<http://veripool.com>.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut
 ######################################################################

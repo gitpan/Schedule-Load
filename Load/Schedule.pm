@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.11 2000/11/30 18:14:40 wsnyder Exp $
+# $Id: Schedule.pm,v 1.13 2001/02/13 17:32:59 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -39,7 +39,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '1.4';
+$VERSION = '1.5';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -383,6 +383,6 @@ The latest version is available from CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut

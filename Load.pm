@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.41 2000/12/01 21:36:11 wsnyder Exp $
+# $Id: Load.pm,v 1.43 2001/02/13 17:32:55 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -44,7 +44,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '1.4';
+$VERSION = '1.5';
 $Debug = 0;
 
 %_Default_Params = (
@@ -356,6 +356,6 @@ C<Schedule::Load::Reporter>, C<Schedule::Load::Schedule>
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut

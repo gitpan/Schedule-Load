@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.7 2000/11/30 18:14:41 wsnyder Exp $
+# $Id: Host.pm,v 1.9 2001/02/13 17:32:59 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -37,7 +37,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '1.4';
+$VERSION = '1.5';
 
 ######################################################################
 #### Globals
@@ -277,6 +277,6 @@ The latest version is available from CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut

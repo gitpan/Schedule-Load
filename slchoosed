@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -Tw
 # slchoosed - choosing deamon for perl Schedule::Load
-# $Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $
+# $Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -88,7 +88,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -96,7 +96,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.9 2000/12/01 20:56:32 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -162,7 +162,7 @@ This package is distributed via CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut
 ######################################################################

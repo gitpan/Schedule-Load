@@ -1,4 +1,5 @@
-# $Id: Makefile.PL,v 1.4 2000/01/21 13:53:34 wsnyder Exp $
+# $Id: Makefile.PL,v 1.6 2001/02/13 14:33:52 wsnyder Exp $
+# DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 
 require 5.005;
 use ExtUtils::MakeMaker;
@@ -25,7 +26,7 @@ dist: distcheck
 WriteMakefile(
 	      DISTNAME	=> 'Schedule-Load',
 	      NAME	=> 'Schedule::Load',
-	      AUTHOR	=> 'Wilson Snyder <wsnyder@world.std.com>',
+	      AUTHOR	=> 'Wilson Snyder <wsnyder@wsnyder.org>',
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
 	      PREREQ_PM => {'Proc::ProcessTable' => 0,

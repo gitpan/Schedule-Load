@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.18 2000/12/01 21:36:44 wsnyder Exp $
+# $Id: Reporter.pm,v 1.20 2001/02/13 17:32:59 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -46,7 +46,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.4';
+$VERSION = '1.5';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 
@@ -505,6 +505,6 @@ This package is distributed via CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $
+# $Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -183,7 +183,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -191,7 +191,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.16 2000/09/22 18:26:36 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -368,7 +368,7 @@ This package is distributed via CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut
 ######################################################################

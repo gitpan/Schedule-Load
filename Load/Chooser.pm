@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.19 2000/12/01 21:36:25 wsnyder Exp $
+# $Id: Chooser.pm,v 1.21 2001/02/13 17:32:59 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.4';
+$VERSION = '1.5';
 
 ######################################################################
 #### Globals
@@ -665,6 +665,6 @@ This package is distributed via CPAN.
 
 =head1 AUTHORS
 
-Wilson Snyder <wsnyder@world.std.com>
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =cut
