@@ -1,14 +1,12 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.37 2002/08/01 14:46:03 wsnyder Exp $
+# $Id: Hosts.pm,v 1.42 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,7 +24,7 @@ require Exporter;
 @ISA = qw(Exporter);
 
 use Socket;
-
+use POSIX qw (EWOULDBLOCK BUFSIZ);
 use Schedule::Load qw(:_utils);
 use Schedule::Load::Hosts::Host;
 use Schedule::Load::Hosts::Proc;
@@ -43,7 +41,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.090';
+$VERSION = '2.100';
 
 ######################################################################
 #### Globals
@@ -309,10 +307,11 @@ sub print_classes {
     $classnum = 0;
     foreach my $class (@classes) {
 	$class_letter{$class} = chr($classnum%26+ord("a"));
-	$out.=sprintf ("%-12s  %s%s%s %s\n",
+	$out.=sprintf ("%-12s  %s%s%s%s- %s\n",
 		       ($classnum==$classes-1)?"HOST":"", 
 		       "| "x$classnum, 
-		       $class_letter{$class}, "--"x($classes-$classnum),
+		       $class_letter{$class}, "--"x($classes-$classnum-1),
+		       $class_letter{$class},
 		       $class);
 	$classnum++;
     }
@@ -320,7 +319,10 @@ sub print_classes {
 	$out .= sprintf "%-12s ", $host->hostname;
 	$classnum = 0;
 	foreach my $class (@classes) {
-	    if ($host->exists($class) && $host->get($class)) {
+	    my $val = $host->get_undef($class);
+	    if ($val && $val > 1) {
+		$out .= sprintf (" %d", $val);
+	    } elsif ($val) {
 		$out .= sprintf (" %s", $class_letter{$class});
 	    } else {
 		$out .= sprintf (" .");
@@ -381,6 +383,7 @@ sub _open {
 	    . "\tYou probably need to run slchoosed\n$self->_request(): Stopped";
     }
     $self->{_fh} = $fh;
+    $self->{_inbuffer} = "";
 }
 
 sub _request {
@@ -393,27 +396,42 @@ sub _request {
     my $fh = $self->{_fh};
     
     print "_request-> $cmd\n" if $Debug;
-    print $fh $cmd;
-    my $line;
-    while (defined ($line = <$fh>)) {
-	chomp $line;
-	#print "GOT $line\n" if $Debug;
-	my ($cmd, $params) = _pthaw($line, $Debug);
-	next if $line =~ /^\s*$/;
-	last if $cmd eq "DONE";
-	if ($cmd eq "host") {
-	    $self->_host_load ($params);
-	} elsif ($cmd eq "best") {
-	    $self->{_best} = $params;
-	} else {
-	    warn "%Warning: Bad Schedule::Load server response: $line\n";
-	    $line = undef;
+    $fh->send_and_check($cmd);
+
+    my $done;
+    my $eof;
+    while (!$done) {
+	if ($self->{_inbuffer} !~ /\n/) {
+	    my $data = '';
+	    my $rv = $fh->sysread($data, POSIX::BUFSIZ, 0);
+	    $self->{_inbuffer} .= $data;
+	    $eof = 1 if !defined $rv || (length $data == 0);
+	    $done ||= $eof;
+	}
+
+	while ($self->{_inbuffer} =~ s/^([^\n]*)\n//) {
+	    my $line = $1;
+	    chomp $line;
+	    print "GOT $line\n" if $Debug;
+	    my ($cmd, $params) = _pthaw($line, $Debug);
+	    next if $line =~ /^\s*$/;
+	    if ($cmd eq "DONE") {
+		$done = 1;
+	    } elsif ($cmd eq "host") {
+		$self->_host_load ($params);
+	    } elsif ($cmd eq "best") {
+		$self->{_best} = $params;
+	    } else {
+		warn "%Warning: Bad Schedule::Load server response: $line\n";
+		$line = undef;
+	    }
 	}
     }
-    if (!defined $line) {
+    if ($eof || !$fh->connected()) {
 	$fh->close();
 	undef $self->{_fh};
     }
+    print "_request DONE-> $cmd\n" if $Debug;
 }
 
 ######################################################################

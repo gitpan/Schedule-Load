@@ -1,14 +1,12 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.50 2002/08/01 14:46:03 wsnyder Exp $
+# $Id: Load.pm,v 1.53 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -38,13 +36,14 @@ use Storable qw (nfreeze thaw);
 use Socket;
 require Exporter;
 BEGIN { eval 'use Data::Dumper';}	#Ok if doesn't exist: debugging only
+use POSIX qw (EWOULDBLOCK BUFSIZ);
 use strict;
 use Carp;
 
 ######################################################################
 #### Configuration Section
 
-$VERSION = '2.090';
+$VERSION = '2.100';
 $Debug = 0;
 
 %_Default_Params = (
@@ -158,6 +157,26 @@ sub new {
     }
     $fh = undef if $?;
     return $fh;
+}
+
+sub send_and_check {
+    my $fh = shift;
+    my $out = join "", @_;
+    # Send any arguments to the filehandle
+    # Returns 0 if failed, else 1
+    while ($out ne "") {
+	if (!$fh || !$fh->connected()) {
+	    return 0;
+	}
+	my $rv = eval { return $fh->syswrite($out); };
+	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
+	    return 0;
+	}
+	if (!defined $rv) { sleep 1; next; }  # Couldn't write: very rare
+	# Truncate what did get out
+	$out = substr ($out, $rv);
+    }
+    return 1;
 }
 
 package Schedule::Load;

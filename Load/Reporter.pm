@@ -1,14 +1,12 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.32 2002/08/01 15:42:00 wsnyder Exp $
+# $Id: Reporter.pm,v 1.35 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -50,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.090';
+$VERSION = '2.100';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -128,39 +126,36 @@ sub start {
 	    print "Servicing input\n" if $Debug;
 
 	    # Snarf input
-	    my $data='';
-	    my $rv = $fh->recv($data, POSIX::BUFSIZ, 0);
-	    if (!defined $rv || (length $data == 0)) {
-		$inbuffer = '';
-		next input;
-	    }
-	    $inbuffer .= $data;
-
-	    my $line;
-	    if ($inbuffer =~ s/(.*?)\n//) {
-		$line = $1;
-	    } else {
-		next readchunk;
+	    if ($inbuffer !~ /\n/) {
+		my $data='';
+		my $rv = $fh->sysread($data, POSIX::BUFSIZ);
+		if (!defined $rv || (length $data == 0)) {
+		    next input;
+		}
+		$inbuffer .= $data;
 	    }
 
-	    chomp $line;
-	    print "REQ $line\n" if $Debug;
-	    my ($cmd, $params) = _pthaw($line, $Debug);
-	    # Commands
-	    if ($cmd eq "report_get_dynamic") {
-		$self->_fill_and_send;
-	    } elsif ($cmd eq "report_fwd_set") {
-		$self->_set_stored($params);
-	    } elsif ($cmd eq "report_fwd_comment") {
-		$self->_comment($params);
-	    } elsif ($cmd eq "report_fwd_fixed_load") {
-		$self->_fixed_load($params);
-	    } elsif ($cmd eq "report_restart") {
-		# Overall fork loop will deal with it.
-		warn "-Info: report_restart\n" if $Debug;
-		exit(0);
-	    } else {
-		warn "%Error: Bad request from server: $line\n" if $Debug;
+	    while ($inbuffer =~ s/(.*?)\n//) {
+		my $line = $1;
+		chomp $line;
+		print "REQ $line\n" if $Debug;
+		my ($cmd, $params) = _pthaw($line, $Debug);
+		# Commands
+		if ($cmd eq "report_get_dynamic") {
+		    $self->_fill_and_send;
+		} elsif ($cmd eq "report_fwd_set") {
+		    $self->_set_stored($params);
+		} elsif ($cmd eq "report_fwd_comment") {
+		    $self->_comment($params);
+		} elsif ($cmd eq "report_fwd_fixed_load") {
+		    $self->_fixed_load($params);
+		} elsif ($cmd eq "report_restart") {
+		    # Overall fork loop will deal with it.
+		    warn "-Info: report_restart\n" if $Debug;
+		    exit(0);
+		} else {
+		    warn "%Error: Bad request from server: $line\n" if $Debug;
+		}
 	    }
 	}
     }
@@ -211,8 +206,8 @@ sub _alive_check {
     my $fh = $self->{socket};
     # Below may die if slchoosed goes down:
     # Our fork() loop will catch it and restart
-    print $fh $msg;
-    if (!$fh || !$fh->connected()) { $self->{socket} = undef; }
+    my $ok = $fh->send_and_check($msg);
+    if (!$ok || !$fh || !$fh->connected()) { $self->{socket} = undef; }
 }
 
 ######################################################################
@@ -464,8 +459,8 @@ sub _send_hash {
 
     my $fh = $self->{socket};
     return if !$fh;
-    print $fh _pfreeze("report_$field", $self->{$field}, $Debug);
-    if (!$fh || !$fh->connected()) { $self->{socket} = undef; }
+    my $ok = $fh->send_and_check(_pfreeze("report_$field", $self->{$field}, $Debug));
+    if (!$ok || !$fh || !$fh->connected()) { $self->{socket} = undef; }
 }
 
 ######################################################################

@@ -1,14 +1,12 @@
 #!/usr/local/bin/perl -w
-# $Id: slrsh,v 1.12 2002/07/28 21:42:41 wsnyder Exp $
+# $Id: slrsh,v 1.13 2002/08/04 18:36:23 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -84,7 +82,7 @@ sub parameter {
 }
 
 sub usage {
-    print '$Id: slrsh,v 1.12 2002/07/28 21:42:41 wsnyder Exp $ ', "\n";
+    print '$Id: slrsh,v 1.13 2002/08/04 18:36:23 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);

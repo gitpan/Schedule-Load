@@ -1,14 +1,12 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.22 2002/08/01 14:46:03 wsnyder Exp $
+# $Id: Schedule.pm,v 1.25 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -39,7 +37,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '2.090';
+$VERSION = '2.100';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -202,7 +200,8 @@ sub _scheduler_params {
     my $self = shift;
 
     my $is_night = (&{$self->{night_hours_cb}} ($self));
-    my $schparams = { classes=>[],
+    my $schparams = { classes=>   [],
+		      match_cb=>  undef,
 		      allow_none=>0,
 		      favor_host=>$self->{favor_host},
 		      hold_time=> $self->{hold_time},
@@ -366,6 +365,13 @@ automatically.
 =item hold_load
 
 Number of cpu loads the hold_key should reserve, defaults to one.
+
+=item match_cb
+
+A string containing a subroutine which will be passed a host reference and
+should return true if this host has the necessary properties.  This will be
+evaluated in a Safe container, and can do only minimal core functions.  For
+example: match_cb=>"sub{return $_[0]->get_undef('memory')>512;}"
 
 =item max_jobs
 

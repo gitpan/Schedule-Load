@@ -1,0 +1,33 @@
+#!/bin/sh
+
+state=$1
+
+case $state in
+'start')
+        echo starting /usr/local/bin/slreportd if present
+	rm -f /tmp/TTYDEVS
+        [ -f /usr/local/bin/slreportd ] &&  su daemon -c /usr/local/bin/slreportd &
+        ;;
+  stop)
+        if test "x`pidof -o $$ -o $PPID -x slreportd`" != x; then
+                echo -n $"Stopping slreportd: "
+                kill `pidof -o $$ -o $PPID -x slreportd`
+                echo
+        fi
+	exit 0
+        ;;
+  restart|reload)
+	$0 stop
+	$0 start
+	exit 0
+	;;
+  status)
+        if test "x`pidof -o $$ -o $PPID -x slreportd`" != x; then
+  	        ps f -ww `pidof -o $$ -o $PPID -x slreportd`
+        fi
+	exit 0
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|reload|status}"
+	exit 1
+esac

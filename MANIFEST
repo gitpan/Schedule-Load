@@ -11,6 +11,8 @@ MANIFEST
 Makefile.PL
 NEWS
 README
+init.d/slchoosed
+init.d/slreportd
 readme.texi
 rschedule
 slchoosed

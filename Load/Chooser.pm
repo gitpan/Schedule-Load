@@ -1,14 +1,12 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.32 2002/08/01 14:46:03 wsnyder Exp $
+# $Id: Chooser.pm,v 1.36 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -49,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.090';
+$VERSION = '2.100';
 
 ######################################################################
 #### Globals
@@ -222,7 +220,7 @@ sub _client_service {
     
     my $fh = $client->{socket};
     my $data = '';
-    my $rv = $fh->recv($data, POSIX::BUFSIZ, 0);
+    my $rv = $fh->sysread($data, POSIX::BUFSIZ);
     if (!defined $rv || (length $data == 0)) {
 	# End of the file
 	_client_close ($client);
@@ -286,21 +284,10 @@ sub _client_send {
     $SIG{PIPE} = 'IGNORE';
 
     my $fh = $client->{socket};
-    while ($out ne "") {
-	if (!$fh || !$fh->connected()) {
-	    # EOF before eval???
-	    _client_close ($client);
-	    return 0;
-	}
-	my $rv = eval { return $fh->send($out, 0); };
-	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
-	    # EOF???
-	    _client_close ($client);
-	    return 0;
-	}
-	if (!defined $rv) { sleep 1; next; }  # Couldn't write: very rare
-	# Truncate what did get out
-	substr ($out, 0, $rv) = '';
+    my $ok = Schedule::Load::Socket::send_and_check($fh, $out);
+    if (!$ok) {
+	_client_close ($client);
+	return 0;
     }
     return 1;
 }
@@ -526,6 +513,7 @@ sub _schedule {
     foreach my $host (@{$Hosts->hosts}) {
 	#print "What about ", $host->hostname, "\n" if $Debug;
 	if ($host->classes_match ($schparams->{classes})
+	    && $host->eval_match ($schparams->{match_cb})
 	    && !$host->reserved) {
 	    my $rating = $host->rating;
 	    #print "Test host ", $host->hostname," rate $rating\n" if $Debug;

@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.13 2001/11/15 14:18:39 wsnyder Exp $
+# $Id: Makefile.PL,v 1.14 2002/08/14 18:49:28 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 
 require 5.005;
@@ -41,7 +41,7 @@ WriteMakefile(
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
 	      PREREQ_PM => {'Proc::ProcessTable' => 0,
-			    'Unix::Processors' => 0,  #1.6, but no VERSION there
+			    'Unix::Processors' => 1.7,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,
 			},

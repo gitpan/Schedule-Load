@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.21 2002/08/01 15:43:05 wsnyder Exp $
+#$Id: test.pl,v 1.23 2002/08/14 19:14:10 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -9,8 +9,14 @@ use Sys::Hostname;
 use IO::Socket;
 use Cwd;
 use Test;
+use strict;
 
-BEGIN { plan tests => 15 }
+use vars qw($Debug $Manual_Server_Start %Host_Load %Hold_Keys
+	    $Port %Invoke_Params);
+
+BEGIN { plan tests => 17 }
+
+######################################################################
 
 $SIG{INT} = \&cleanup_and_exit;
 
@@ -29,7 +35,6 @@ BEGIN {
 }
 
 use Schedule::Load::Schedule;
-$loaded = 1;
 ok(1); #2
 
 if ($Schedule::Load::_Default_Params{port} =~ /^\d$/) {
@@ -51,8 +56,9 @@ $Port = 12123;  $Port = socket_find_free (12123) if !$Manual_Server_Start;
 ############
 # Setup
 
-#$Schedule::Load::Debug = $Debug;
-#$Schedule::Load::Hosts::Debug = $Debug;
+#$Debug = 1;
+$Schedule::Load::Debug = $Debug;
+$Schedule::Load::Hosts::Debug = $Debug;
 
 `rm -rf test_store`; #Ok if error
 mkdir ('test_store', 0777);
@@ -66,7 +72,7 @@ if (!$Manual_Server_Start) {
     start_server ("./slreportd class_verilog=1 reservable=1 --nofork"
 		  # Stored filename must be absolute as deamon chdir's
 		  ." --stored_filename=".getcwd()."/test_store/".hostname());
-    check_server_up(6);  # (6 children: perl, sh, choose sh, choose, report sh, report)
+    check_server_up(6 + ($Debug?2:0));  # (6 children: perl, sh, choose sh, choose, report sh, report)
     sleep 5;
 }
 
@@ -95,10 +101,16 @@ my $cpus = $scheduler->cpus;
 print "Total cpus in network: $cpus\n";
 ok ($cpus>0);
 
+# Check evals
+print "eval_match check\n";
+ok (testeval(sub{return 1;})==1);
+ok (testeval('sub{return $_[0]->get_undef("class_verilog");}')==1);
+
 # Choose host, get this one
-my @classes = $scheduler->classes();
-#testclass (@classes);
-testclass (['verilog']);
+testclass (['verilog'], undef);
+ok(1);
+
+testclass (undef, "sub {return 1;}");
 ok(1);
 
 # Check holds
@@ -171,35 +183,50 @@ sub check_load {
     return 1;
 }
 
+my $Testclass_Id = 0;
 sub testclass {
     my $classlist = shift;
+    my $match_cb = shift;
 
     print "="x70, "\n";
-    print "Machines of class ", join(' ',@{$classlist}), ":\n";
+    print "Machines of class ", join(' ',@{$classlist}), ":\n" if $classlist;
     foreach my $host ($scheduler->hosts_of_class(classes => $classlist)) {
 	printf "  %s", $host->hostname;
     }
     print "\n\n";
     
     for (my $i=0; $i<2; $i++) { #FIX 20
-
 	if ($Debug) {
 	    $scheduler->fetch;
 	    print $scheduler->print_hosts;
 	}
 
-	my $key = "Perl_Test_".$$."_$i";
-	$best = $scheduler->best(classes => $classlist,
-				 hold_key => $key);
+	my $key = "Perl_Test_".$$."_".(++$Testclass_Id);
+	my $best = $scheduler->best(classes => $classlist,
+				    match_cb => $match_cb,
+				    hold_key => $key);
 	if ($best) {
 	    $Host_Load{$best} ++;
 	    $Hold_Keys{$key} = $best;
-	    $jobs = $scheduler->jobs(classes => $classlist);
+	    my $jobs = $scheduler->jobs(classes => $classlist);
 	    print "Best is $best, suggest $jobs jobs\n";
 	} else {
 	    warn "%Warning: No machines found\n";
 	}
     }
+}
+
+sub testeval {
+    my $subref = shift;
+    my $n = 0;
+    foreach my $host ( @{$scheduler->hosts} ){
+	if ($host->eval_match($subref)) {
+	    printf "  %s", $host->hostname;
+	    $n++;
+	}
+    }
+    print "\n";
+    return $n;
 }
 
 ######################################################################
@@ -280,7 +307,7 @@ sub start_server {
     $cmd .= " --nofork";  # Need children under this parent so can kill them
     $cmd .= " && perl -e '<STDIN>'";
 
-    $pid = fork();
+    my $pid = fork();
     if ($pid==0) {
 	system ($cmd);
 	exit($?);

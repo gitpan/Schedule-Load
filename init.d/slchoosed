@@ -1,0 +1,32 @@
+#!/bin/sh
+
+state=$1
+
+case $state in
+'start')
+        echo starting /usr/local/bin/slchoosed if present
+        [ -f /usr/local/bin/slchoosed ] &&  su daemon -c /usr/local/bin/slchoosed &
+        ;;
+  stop)
+        if test "x`pidof -o $$ -o $PPID -x slchoosed`" != x; then
+                echo -n $"Stopping slchoosed: "
+                kill `pidof -o $$ -o $PPID -x slchoosed`
+                echo
+        fi
+	exit 0
+        ;;
+  restart|reload)
+	$0 stop
+	$0 start
+	exit 0
+	;;
+  status)
+        if test "x`pidof -o $$ -o $PPID -x slchoosed`" != x; then
+  	        ps f -ww `pidof -o $$ -o $PPID -x slchoosed`
+        fi
+	exit 0
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|reload|status}"
+	exit 1
+esac

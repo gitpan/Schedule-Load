@@ -1,15 +1,13 @@
 #!/usr/local/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $
+# $Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -127,7 +125,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -135,7 +133,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.19 2002/07/03 13:23:18 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

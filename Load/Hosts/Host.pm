@@ -1,14 +1,12 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.16 2002/08/01 14:46:03 wsnyder Exp $
+# $Id: Host.pm,v 1.21 2002/08/30 14:59:10 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of either the GNU General Public License or the
-# Perl Artistic License, with the exception that it cannot be placed
-# on a CD-ROM or similar media for commercial distribution without the
-# prior approval of the author.
+# Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -29,18 +27,21 @@ require AutoLoader;
 use Schedule::Load qw(_min _max);
 use Schedule::Load::Hosts::Proc;
 
-use strict;
-use vars qw($VERSION $AUTOLOAD);
+use Safe;
 use Carp;
+use strict;
+use vars qw($VERSION $AUTOLOAD $Debug);
 
 ######################################################################
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '2.090';
+$VERSION = '2.100';
 
 ######################################################################
 #### Globals
+
+$Debug = $Schedule::Load::Debug;
 
 ######################################################################
 #### Special status
@@ -91,15 +92,46 @@ sub get_undef {
     }
 }
 
+######################################################################
+#### Matching
+
 sub classes_match {
-    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(field, classesref))';
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
     my $classesref = shift;
-    return 1 if !defined $classesref;  # Null reference means match everything
+    return 1 if !defined $classesref || !defined $classesref->[0];  # Null reference means match everything
     (ref($classesref)) or croak 'usage: '.__PACKAGE__.'->classes_match(field, classesref))';
     foreach (@{$classesref}) {
 	return 1 if get_undef($self, $_);
     }
     return 0;
+}
+
+sub eval_match {
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->eval_match(subroutine)';
+    my $subref = shift;
+    return 1 if !defined $subref;  # Null reference means match everything
+    if (ref $subref) {
+	return $subref->($self);
+    } else {
+	#print "eval_match: $subref\n" if $Debug;
+	my $compartment = new Safe;
+	$compartment->permit(qw(:base_core));
+	$@ = "";
+	@_ = ($self);  # Arguments to pass to reval
+	my $code = $compartment->reval($subref);
+	if ($@ || !$code) {
+	    print "eval_match: $@: $subref\n" if $Debug;
+	    return 0;
+	}
+	my $result = $code->($self);
+	if ($Debug) {   # Try again in non-safe container
+	    @_ = ($self);  # Arguments to pass to reval
+	    my $dcode = eval($subref);
+	    my $dresult = $dcode->($self);
+	    die "%Error: Safe mismatch: '$result' ne '$dresult'\n" if $dresult ne $result;
+	}
+	return $result;
+    }
 }
 
 ######################################################################
@@ -186,6 +218,18 @@ This package provides accessors for information about a specific
 host obtained via the Schedule::Load::Host package.
 
 =over 4 
+
+=item classes_match
+
+Passed an array reference.  Returns true if this host's class matches any
+class in the array referenced.
+
+=item eval_match
+
+Passed a subroutine reference that takes a single argument of a host
+reference.  Returns true if the subroutine returns true.  It may also be
+passed a string which forms a subroutine ("sub { my $self = shift; ....}"),
+in which case the string will be evaluated in a safe container.
 
 =item fields
 
