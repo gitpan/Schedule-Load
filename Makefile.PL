@@ -1,5 +1,9 @@
-# $Id: Makefile.PL,v 1.16 2003/08/22 15:17:19 wsnyder Exp $
+# $Id: Makefile.PL,v 1.19 2004/01/27 19:03:50 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
+#
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 
 require 5.005;
 use ExtUtils::MakeMaker;
@@ -7,15 +11,31 @@ use Carp;
 
 sub MY::postamble {
 "
+
+RSCHLIB = /usr/local/lib
+RSCHLIB_EDIT_FN = blib/lib/Schedule/Load/Reporter.pm
+
+pure_all::
+	\$(PERL) -p -e \"s!RSCHLIB = '.*'!RSCHLIB = '\$(RSCHLIB)'!g\" < \$(RSCHLIB_EDIT_FN) > \$(RSCHLIB_EDIT_FN).new
+	mv \$(RSCHLIB_EDIT_FN).new \$(RSCHLIB_EDIT_FN)
+
 install::
-	-mkdir -p /usr/local/lib/rschedule
-	-chmod a+rw /usr/local/lib/rschedule
+	-mkdir -p   \$(RSCHLIB)/rschedule
+	-chmod a+rw \$(RSCHLIB)/rschedule
 
 install-here::
-	make INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 INSTALLBIN=/usr/local/bin INSTALLSCRIPT=/usr/local/bin install
+	make	INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 \
+		INSTALLBIN=/usr/local/bin INSTALLSCRIPT=/usr/local/bin \
+		RSCHLIB=/usr/local/lib \
+		install
 
 install-test::
-	make INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 INSTALLBIN=/usr/local/test/bin INSTALLSCRIPT=/usr/local/test/bin INSTALLSITELIB=/usr/local/test/lib INSTALLSITEARCH=/usr/local/test/lib/i686-linux install
+	make	INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 \
+		INSTALLBIN=/usr/local/test/bin 	INSTALLSCRIPT=/usr/local/test/bin \
+		INSTALLSITELIB=/usr/local/test/lib \
+		INSTALLSITEARCH=/usr/local/test/lib/i686-linux \
+		RSCHLIB=/usr/local/test/lib \
+		install
 
 README: readme.texi
 	-rm \$@

@@ -1,21 +1,16 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.44 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Reporter.pm,v 1.48 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Reporter;
@@ -39,7 +34,7 @@ use IPC::PidStat;
 use Config;
 
 use strict;
-use vars qw($VERSION $Debug %User_Names %Pid_Inherit 
+use vars qw($VERSION $RSCHLIB $Debug %User_Names %Pid_Inherit 
 	    @Pid_Time_Base @Pid_Time $Os_Linux
 	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu
 	    $Exister
@@ -52,7 +47,9 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.002';
+$VERSION = '3.003';
+
+$RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -93,7 +90,7 @@ sub start {
     # More defaults (can't be above due to needing other elements)
     $self->{const}{hostname} ||= hostname();
     $self->{const}{slreportd_hostname} ||= hostname();
-    $self->{stored_filename} ||= ("/usr/local/lib/rschedule/slreportd_".$self->{const}{hostname}."_store");
+    $self->{stored_filename} ||= ($RSCHLIB."/rschedule/slreportd_".$self->{const}{hostname}."_store");
 
     (defined $self->{dhost}) or croak 'Require a host parameter';
     #foreach (@{$self->{dhost}}) { print "Host $_\n"; }
@@ -581,7 +578,6 @@ __END__
 
 =pod
 
-
 =head1 NAME
 
 Schedule::Load::Reporter - Distributed load reporting daemon
@@ -634,11 +630,11 @@ the list of top processes sent to the client.  Defaults to 3.  Setting to
 
 =item stored_filename
 
-The filename to store persistant items in, such as if this host is
+The filename to store persistent items in, such as if this host is
 reserved.  Must be either local-per-machine, or have the hostname in it.
 Defaults to /usr/local/lib/rschedule/slreportd_{hostname}_store.  Set to
-undef to disable persistance (thus if the machine reboots the reservation
-is lost.)   The path must be **ABSOLUTE** as the deamons do a chdir.
+undef to disable persistence (thus if the machine reboots the reservation
+is lost.)   The path must be **ABSOLUTE** as the daemons do a chdir.
 
 =back
 

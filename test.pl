@@ -1,7 +1,11 @@
-#$Id: test.pl,v 1.24 2003/04/24 13:14:09 wsnyder Exp $
+#$Id: test.pl,v 1.26 2004/01/27 19:03:50 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
+#
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 
 ######################### We start with some black magic to print on failure.
 

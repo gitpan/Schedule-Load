@@ -1,26 +1,20 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $
+# $Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 require 5.004;
-BEGIN { $ENV{SLCHOOSED_HOST} ||= "tomcat:mondo"; } #FIX
 use lib 'blib/lib';	# testing
 use English;
 use Getopt::Long;
@@ -221,7 +215,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -229,7 +223,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -253,7 +247,7 @@ __END__
 
 =head1 NAME
 
-rschedule - User interface for perl Schedule::Load configuration and status
+rschedule - User interface for Perl Schedule::Load configuration and status
 
 =head1 SYNOPSIS
 
@@ -297,7 +291,7 @@ B<rschedule> [ B<--load=>I<load> ] B<fixed_load> B<pid>
 =head1 DESCRIPTION
 
 rschedule will report or set status for load distribution using the
-perl Schedule::Load package.
+Perl Schedule::Load package.
 
 If symbolically linked to the name "rtop" rschedule will by default produce
 a listing of each host and the top loads on those hosts.  Similarly, a link
@@ -351,11 +345,11 @@ load and system type.
 
 =item hostnames
 
-Displays list of each hostname.  Multi-cpu hosts appear once.
+Displays list of each hostname.  Multi-CPU hosts appear once.
 
 =item idle_host_names
 
-Displays list of each idle cpu.  Multi-cpu hosts appear multiple times.
+Displays list of each idle CPU.  Multi-CPU hosts appear multiple times.
 
 =item loads
 
@@ -364,7 +358,7 @@ jobs.
 
 =item release
 
-Releases a host from dedicated use.  Use --host to specify whish host.
+Releases a host from dedicated use.  Use --host to specify which host.
 
 =item reserve
 
@@ -372,7 +366,7 @@ Reserves a host for dedicated use.  To be reservable the C<reservable> flag
 must be set when that host's C<slreportd> is invocated.  This is indicated
 on the top report by a "R" in the column next to the command.  To override
 a existing reservation you need to release the reservation first.  Use
---host to specify whish host.  A optional --comment specifies the
+--host to specify which host.  A optional --comment specifies the
 reservation comment; the default time and user will be prepended unless a
 leading - is used.
 
@@ -380,7 +374,7 @@ leading - is used.
 
 Sets a constant reporter parameter to the specified value.  Slreportd will
 loose the information when rebooted, so this should only be used to avoid
-restarting the deamon after changing the slreportd's boot flags.
+restarting the daemon after changing the slreportd's boot flags.
 
 =item set_stored B<var=value>
 
@@ -389,7 +383,7 @@ keep the information when rebooted, and override any set_const setting.
 
 =item status
 
-Displays a listing of each host and its deamon's status.  Intended only for
+Displays a listing of each host and its daemon's status.  Intended only for
 debugging problems with the scheduler.
 
 =item top

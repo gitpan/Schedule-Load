@@ -1,21 +1,16 @@
 # Schedule::Load::Hosts::Proc.pm -- Process information
-# $Id: Proc.pm,v 1.20 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Proc.pm,v 1.23 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Hosts::Proc;
@@ -34,7 +29,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.002';
+$VERSION = '3.003';
 
 ######################################################################
 #### Globals
@@ -138,7 +133,7 @@ Returns the value of a specific field for this process.
 
 A accessor exists for each field returned by the fields() call.  Typical
 elements are described below.  All fields that C<Proc::ProcessTable>
-supports are also accessable.
+supports are also accessible.
 
 =over 4 
 

@@ -1,21 +1,16 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.16 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: FakeReporter.pm,v 1.19 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::FakeReporter;
@@ -30,7 +25,7 @@ use POSIX;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.002';
+$VERSION = '3.003';
 
 ######################################################################
 #### Local process table
@@ -141,7 +136,6 @@ __END__
 
 =pod
 
-
 =head1 NAME
 
 Schedule::Load::FakeReporter - Distributed load reporting daemon
@@ -158,7 +152,7 @@ C<Schedule::Load::FakeReporter> creates a
 C<Schedule::Load::Reporter::ProcessTable> similar to C<Proc::ProcessTable>,
 which allows replacing the normal host information with special fixed
 information.  This allows the Schedule::Load facilities to be used to
-manage other resources, such as labratory equipment, that has CPU like
+manage other resources, such as laboratory equipment, that has CPU like
 status, but cannot locally run slreportd.
 
 Pctcpu is based on the load_limit or if unspecified, each fixed load counts

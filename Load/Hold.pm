@@ -1,20 +1,15 @@
-# $Id: Hold.pm,v 1.3 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Hold.pm,v 1.6 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2003 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Hold;
@@ -29,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.002';
+$VERSION = '3.003';
 
 ######################################################################
 #### Creators
@@ -111,7 +106,7 @@ Schedule::Load::Hold - Return hold/wait information
 
 This package provides accessors for information about a specific request
 that is either waiting for a host, or has obtained a host and is holding it
-temporarially.
+temporarily.
 
 =head1 ACCESSORS
 

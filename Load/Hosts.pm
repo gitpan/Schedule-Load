@@ -1,21 +1,16 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.59 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Hosts.pm,v 1.63 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Hosts;
@@ -42,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.002';
+$VERSION = '3.003';
 
 ######################################################################
 #### Globals
@@ -321,7 +316,7 @@ sub print_status {
     {
 	(my $FORMAT =           "%-12s     %-17s        %s\n") =~ s/\s\s+/ /g;
 	$out.=sprintf ($FORMAT, "CHOOSER", "CONNECTED", "DAEMON STATUS");
-	my $t = localtime($hosts->{chooinfo}{slchoosed_connect_time});
+	my $t = localtime($hosts->{chooinfo}{slchoosed_connect_time}||0);
 	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
 	$out.=sprintf ($FORMAT,
 		       $hosts->{chooinfo}{slchoosed_hostname},
@@ -332,7 +327,7 @@ sub print_status {
     (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-17s        %6s      %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DELAY", "DAEMON STATUS");
     foreach my $host ( @{$hosts->hosts} ){
-	my $t = localtime($host->slreportd_connect_time);
+	my $t = localtime($host->slreportd_connect_time||0);
 	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
@@ -619,7 +614,6 @@ __END__
 
 =pod
 
-
 =head1 NAME
 
 Schedule::Load::Hosts - Return host loading information across a network
@@ -680,7 +674,7 @@ parameter if true (default) restarts reporter.
 
 =item hosts ()
 
-Returns the host objects, accessable with C<Schedule::Load::Hosts::Host>.
+Returns the host objects, accessible with C<Schedule::Load::Hosts::Host>.
 In an array context, returns a list; In a a scalar context, returns a
 reference to a list.
 

@@ -1,21 +1,16 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.53 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Chooser.pm,v 1.57 2004/01/27 19:03:50 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Chooser;
@@ -52,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.002';
+$VERSION = '3.003';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -82,7 +77,7 @@ sub start {
     my $self = {
 	%Schedule::Load::_Default_Params,
 	#Documented
-	cache_time=>2,	# Secs to hold cache for
+	cache_time=>5,	# Secs to hold cache for
 	dead_time=>45,	# Secs lack of ping indicates dead
 	@_,};
     bless $self, $class;
@@ -274,6 +269,7 @@ sub _client_service {
 	    # Older reporters don't have the _update flag, so support them too
 	    _host_start ($client, $params) if !$params->{_update};
 	    _host_dynamic ($client, "const", $params) if !$client->{_broken};
+	    _host_const_chooseinfo($client->{host});
 	} elsif ($cmd eq "report_stored") {
 	    _host_dynamic ($client, "stored", $params);
 	} elsif ($cmd eq "report_dynamic") {
@@ -362,9 +358,7 @@ sub _host_start {
 	      };
     bless $host, "Schedule::Load::Hosts::Host";
 
-    $host->{const}{slreportd_connect_time} = time();
-    $host->{const}{slreportd_status} = "Connected";
-    $host->{const}{slreportd_delay} = undef;
+    _host_const_chooseinfo($host);
 
     # Remove any earlier connection
     my $oldhost = $Hosts->{hosts}{$hostname};
@@ -392,6 +386,13 @@ sub _host_start {
     $Hosts->{hosts}{$hostname} = $host;
     $client->{host} = $host;
     #print "const: ", Data::Dumper::Dumper($host) if $Debug;
+}
+
+sub _host_const_chooseinfo {
+    my $host = shift;
+    $host->{const}{slreportd_connect_time} ||= time();
+    $host->{const}{slreportd_status} ||= "Connected";
+    $host->{const}{slreportd_delay} ||= undef;
 }
 
 sub _host_dynamic {

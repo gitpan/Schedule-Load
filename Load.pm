@@ -1,21 +1,16 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.58 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Load.pm,v 1.63 2004/01/27 19:03:50 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 require 5.005;
@@ -43,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.002';
+$VERSION = '3.003';
 $Debug = 0;
 
 %_Default_Params = (
@@ -198,8 +193,12 @@ Schedule::Load - Load distribution and status across multiple host machines
 
 =head1 SYNOPSIS
 
+  #*** See the SETUP section of the Schedule::Load manpage.
+  #*** Daemons must be running for this test
+
   # Get per-host or per top process information
   use Schedule::Load::Hosts;
+  my $hosts = Schedule::Load::Hosts->fetch();
   foreach my $host ($hosts->hosts) {
       printf $host->hostname," is on our network\n";
   }
@@ -207,17 +206,16 @@ Schedule::Load - Load distribution and status across multiple host machines
   # Choose hosts
   use Schedule::Load::Schedule;
   my $scheduler = Schedule::Load::Schedule->fetch();
-  print "Best host for a new job: ", $scheduler->best();
+  print "Best host for a new job: ", $scheduler->best(), "\n";
 
   # user access
-  rtop
   rschedule reserve <hostname>
 
 =head1 DESCRIPTION
 
 This package provides useful utilities for load distribution and status
 across multiple machines in a network.  To just see what is up in the
-network, see the C<rschedule> or C<rtop>, C<rloads> or C<rhosts> commands.
+network, see the C<rschedule> command.
 
 The system is composed of four unix programs (each also with a underlying
 Perl module):
@@ -227,29 +225,32 @@ Perl module):
 =item rschedule
 
 C<rschedule> is a command line interface to this package.  It and the
-aliases C<rtop>, C<rhosts>, and C<rloads> report the current state of the
-network including hosts and top loading.  C<rschedule> also allows reserving
-hosts and setting the classes of the machines, as described later.
+potential aliases C<rtop>, C<rhosts>, and C<rloads> report the current
+state of the network including hosts and top loading.  C<rschedule> also
+allows reserving hosts and setting the classes of the machines, as
+described later.
+
+=item slchoosed
+
+C<slchoosed> is run on one host in the network.  This host is specified in
+the SLCHOOSED_HOST environment variable, which may also specify additional
+cold standby hosts in case the first host goes down.  Slchoosed collects
+connections from the C<slreportd> reporters, and maintains a internal
+database of the entire network.  User clients also connect to the chooser,
+which then gets updated information from the reporters, and returns the
+information to the user client.  As the chooser has the entire network
+state, it can also choose the best host across all CPUs in the network.
 
 =item slreportd
 
-C<slreportd> is run on every host in the network, usually started with a
-init.d script.  It reports itself to the C<slchoosed> daemon periodically,
-and is responsible for checking loading and top processes specific to the
-host that it runs on.
+C<slreportd> must be running on every host in the network, usually started
+with a init.d script.  It reports itself to the C<slchoosed> daemon
+periodically, and is responsible for checking loading and top processes
+specific to the host that it runs on.
 
 C<slreportd> may also be invoked with some variables set.  This allows
 static host information, such as class settings to be passed to
 applications.
-
-=item slchoosed
-
-C<slchoosed> is run on one host in the network.  It collects connections
-from the C<slreportd> reporters, and maintains a internal database of the
-entire network.  User clients also connect to the chooser, which then gets
-updated information from the reporters, and returns the information to the
-user client.  As the chooser has the entire network state, it can also
-choose the best host across all CPUs in the network.
 
 =item slpolice
 
@@ -333,7 +334,7 @@ etc.
 =head1 HOLD KEYS
 
 Hold keys allow a job request to be queued, so that when the resource is
-freed, it will be issued to the oldest requestor.  The hold will persist
+freed, it will be issued to the oldest requester.  The hold will persist
 for a specified time until a process actually starts up on the selected
 host, and enough CPU time elapses for that new process to claim CPU time.
 
@@ -348,7 +349,7 @@ hosts> to occasionally be higher then the number of jobs on that host.
 Some jobs have CPU usage patterns which contain long periods of low CPU
 activity, such as when doing disk IO.  C<make> is a typical example; the
 parent make process uses little CPU time, but the children of the make pop
-in and out of the cpu run list.
+in and out of the CPU run list.
 
 When scheduling, it is useful to have such jobs always count as one (or
 more) job, so that the idle time is not misinterpreted and another job
@@ -357,9 +358,31 @@ parent to count as a given fixed CPU load.  Using C<make> again, if the
 parent make process is set as a fixed_load of one, the make and all
 children will always count as one load, even if not consuming CPU
 resources.  The C<rschedule loads> or C<rloads> command includes not only
-top cpu users, but also all fixed loads.  If a child process is using CPU
+top CPU users, but also all fixed loads.  If a child process is using CPU
 time, that is what is displayed.  If no children are using appreciable CPU
 time (~2%), the parent is the one shown in the loads list.
+
+=head1 SETUP
+
+When setting a new site with Schedule::Load, first read the DESCRIPTION
+section about the various daemons.  
+
+Then, pick a reliable master machine for the chooser.  Set the
+SLCHOOSED_HOST environment variable to include this host name, and add this
+setting to a site wide file so that all users including daemons may see it
+when booting.  You may add additional colon separated hostnames which will
+be backups if the first machine is down.  Run slchoosed on the
+SLCHOOSED_HOST specified host(s).
+
+On all the hosts in the network you wish to schedule onto, check
+SLCHOOSED_HOST is set appropriately, then run slreportd.  Optionally run
+pidstatd (from IPC::Locker) on these hosts also.
+
+The C<rschedule hosts> command should now show your hosts.
+
+If you run slreportd before slchoosed, there may be a 60 second wait before
+slreportd detects the new slchoosed process is running.  During this time
+rschedule won't show all of the hosts.
 
 =head1 DISTRIBUTION
 

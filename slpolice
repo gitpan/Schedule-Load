@@ -1,21 +1,16 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.18 2002/11/05 23:28:20 wsnyder Exp $
+# $Id: slpolice,v 1.21 2004/01/27 19:03:50 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 require 5.005;
@@ -61,7 +56,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.18 2002/11/05 23:28:20 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.21 2004/01/27 19:03:50 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -226,7 +221,7 @@ __END__
 
 =head1 NAME
 
-slpolice - Warn and renice top cpu hogs
+slpolice - Warn and renice top CPU hogs
 
 =head1 SYNOPSIS
 

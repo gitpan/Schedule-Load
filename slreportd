@@ -1,23 +1,18 @@
 #!/usr/local/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.24 2003/05/08 20:17:15 wsnyder Exp $
+# $Id: slreportd,v 1.27 2004/01/27 19:03:50 wsnyder Exp $
 ################ Introduction ################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 require 5.004;
@@ -140,7 +135,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.24 2003/05/08 20:17:15 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.27 2004/01/27 19:03:50 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -148,7 +143,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.24 2003/05/08 20:17:15 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.27 2004/01/27 19:03:50 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -166,7 +161,7 @@ __END__
 
 =head1 NAME
 
-slreportd - Distributed load reporter for perl Schedule::Load
+slreportd - Distributed load reporter for Perl Schedule::Load
 
 =head1 SYNOPSIS
 
@@ -179,7 +174,17 @@ B<slreportd>
 =head1 DESCRIPTION
 
 slreportd will start a daemon to report machine loading for the
-Schedule::Load package.
+Schedule::Load package.  It will create two similar processes, so that if
+second process exits, the first may restart it automatically.
+
+C<slreportd> must be running on every host in the network, usually started
+with a init.d script.  It reports itself to the C<slchoosed> daemon
+periodically, and is responsible for checking loading and top processes
+specific to the host that it runs on.
+
+C<slreportd> may also be invoked with some variables set.  This allows
+static host information, such as class settings to be passed to
+applications.
 
 =head1 ARGUMENTS
 
@@ -188,10 +193,6 @@ Schedule::Load package.
 =item --help
 
 Displays this message and program version and exits.
-
-=item --port
-
-Specifies the port number that slchoosed uses.
 
 =item --dhost
 
@@ -208,13 +209,23 @@ overridden, for example:
 slreportd hostname=lab_1 cpus=1 max_clock=100 osname=myos osvers=1
           archname=myarch reservable=1 load_limit=1
 
+=item --nofork
+
+For debugging, prevents the daemon from creating additional processes and
+from going into the background.  This allows messages to appear on stdout,
+and ctrl-C to stop the daemon.
+
+=item --port
+
+Specifies the port number that slchoosed uses.
+
 =item --version
 
 Displays program version and exits.
 
 =item {variable}={value}
 
-Sets a arbitary constant variable to the specified value.  This variable
+Sets a arbitrary constant variable to the specified value.  This variable
 may be used so that a process requesting a machine can choose a machine
 with specific properties.
 

@@ -1,21 +1,16 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.35 2003/09/05 18:18:04 wsnyder Exp $
+# $Id: Schedule.pm,v 1.38 2004/01/27 19:03:51 wsnyder Exp $
 ######################################################################
 #
-# This program is Copyright 2002 by Wilson Snyder.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of either the GNU General Public License or the
-# Perl Artistic License.
+# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# you can redistribute it and/or modify it under the terms of either the GNU
+# General Public License or the Perl Artistic License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public License write to
-# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
-# MA 02139, USA.
 ######################################################################
 
 package Schedule::Load::Schedule;
@@ -38,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.002';
+$VERSION = '3.003';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -286,7 +281,6 @@ __END__
 
 =pod
 
-
 =head1 NAME
 
 Schedule::Load::Schedule - Functions for choosing a host among many
@@ -300,7 +294,7 @@ Schedule::Load::Schedule - Functions for choosing a host among many
 
 =head1 DESCRIPTION
 
-This package will allow the most lightly loaded host to be choosen for new
+This package will allow the most lightly loaded host to be chosen for new
 jobs across many machines across a entire network.
 
 It is also a superclass of Schedule::Load::Hosts, so any functions that
@@ -315,12 +309,12 @@ work for that module also work here.
 Returns the hostname of the best host in the network for a single new job.
 Parameters may be parameters specified in this class, Schedule::Load::Hold,
 or Schedule::Load::ResourceReq.  Those packages must be used individually
-if multiple resources need to be scheduled simultanously.
+if multiple resources need to be scheduled simultaneously.
 
 =item fixed_load (load=>load_value, [pid=>$$], [host=>localhost], [req_pid=>$$, req_hostname=>localhost])
 
 Sets the current process and all children as always having at least the
-load value specified.  This prevents undercounting CPU utilization when a
+load value specified.  This prevents under-counting CPU utilization when a
 large batch job is running which is just paused in the short term to do
 disk IO or sleep.  Requests to fake reporters (resources not associated
 with a CPU) may specify req_pid and req_hostname which are the PID and
@@ -349,7 +343,7 @@ release does not have to be the same user that reserved the host.
 =item reserve (host=>hostname, [comment=>comment])
 
 Reserves the machine for exclusive use of the current user.  The host
-choosen must have the reservable flag set.  C<rschedule hosts> will show
+chosen must have the reservable flag set.  C<rschedule hosts> will show
 the host as reserved, along with the provided comment.
 
 =item schedule (hold=>Schedule::Load::Hold ref, resources=>[], [allow_none=>1])
@@ -366,10 +360,10 @@ the last schedule() call.
 
 =item set_stored (host=>hostname, [set_const=>1], [key=>value])
 
-Set a key/value parameter on the persistant storage on the remote server,
+Set a key/value parameter on the persistent storage on the remote server,
 such as if a class is allowed on that host.  With const=>1, don't make it
-persist, but make it look like the deamon was started with that option;
-when the deamon restarts the information will be lost.
+persist, but make it look like the daemon was started with that option;
+when the daemon restarts the information will be lost.
 
 =back
 
@@ -383,10 +377,10 @@ C<Schedule::Load::Hosts>.
 =item allow_none
 
 If allow_none is true, if there is less then a free CPU across the entire
-network, then no cpu will be choosen.  This is useful for programs that can
+network, then no cpu will be chosen.  This is useful for programs that can
 dynamically adjust their outstanding job count.  (Presumably you would only
 set allow_none if you already have one job running, or you can get
-livelocked out of getting anything!)
+live-locked out of getting anything!)
 
 =back
 
