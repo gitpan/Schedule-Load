@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Proc.pm -- Process information
-# $Id: Proc.pm,v 1.24 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Proc.pm,v 1.27 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -29,7 +29,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 ######################################################################
 #### Globals
@@ -132,7 +132,7 @@ Returns the value of a specific field for this process.
 =head1 ACCESSORS
 
 A accessor exists for each field returned by the fields() call.  Typical
-elements are described below.  All fields that C<Proc::ProcessTable>
+elements are described below.  All fields that L<Proc::ProcessTable>
 supports are also accessible.
 
 =over 4 
@@ -152,16 +152,20 @@ Texual user name running this process.
 
 =back
 
-=head1 SEE ALSO
-
-C<Schedule::Load>, C<Schedule::Load::Hosts>, C<Schedule::Load::Hosts::Host>
-
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<Schedule::Load::Hosts>, L<Schedule::Load::Hosts::Host>
 
 =cut

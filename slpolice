@@ -1,5 +1,5 @@
-#!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.21 2004/01/27 19:03:50 wsnyder Exp $
+#!/usr/bin/perl -w
+# $Id: slpolice,v 1.24 2004/08/26 15:04:21 ws150726 Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -56,7 +56,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.21 2004/01/27 19:03:50 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.24 2004/08/26 15:04:21 ws150726 Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -247,6 +247,11 @@ Usually slpolice is run with a crontab entry similar to:
 This sends warnings each hour after 2 hours of CPU time.  It does not check
 at night so that long overnight jobs will not receive warnings.
 
+This program is most valuable when used with the L<nicercizerd> program, or
+a operating system where nice 19 processes get only leftover cpu resources.
+It requires a program called L<nice19> which is a version of nice that is
+setgid root and renices a job to 19.  This comes with L<nicercizerd>.
+
 =head1 ARGUMENTS
 
 =over 4
@@ -286,26 +291,23 @@ Displays program version and exits.
 
 =back
 
-=head1 SEE ALSO
-
-C<nicercizerd>, 
-C<Schedule::Load>
-
-This program is most valuable when used with the C<nicercizerd> program, or
-a operating system where nice 19 processes get only leftover cpu resources.
-It requires a program called C<nice19> which is a version of nice that is
-setgid root and renices a job to 19.  This comes with C<nicercizerd>.
-
 =head1 DISTRIBUTION
 
-This package is distributed via CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-C<Nicercizerd> is available from
-C<http://veripool.com>.
+L<nicercizerd> is available from L<http://veripool.com>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<nicercizerd>,  L<nice19>,
 
 =cut
 ######################################################################

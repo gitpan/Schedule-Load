@@ -1,4 +1,4 @@
-# $Id: ResourceReq.pm,v 1.6 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: ResourceReq.pm,v 1.10 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 ######################################################################
 #### Creators
@@ -107,9 +107,13 @@ prevents nasty deadlocks (like the chopsticks deadlock.)
 
 =head1 METHODS
 
+=over 4
+
 =item new (...)
 
 Create a new object with the parameters specified in the following section.
+
+=back
 
 =head1 PARAMETERS
 
@@ -159,24 +163,22 @@ host may not be used.  Ratings closer to zero are better.  Defaults to a
 function that includes the load_limit and the cpu percentage free.
 Evaluated in a Safe container, and can do only minimal core functions.
 
-=item
-
-=item
-
-=item
-
 =back
-
-=head1 SEE ALSO
-
-C<Schedule::Load>, C<Schedule::Load::Hosts>, C<Schedule::Load::Hosts::Host>
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<Schedule::Load::Hosts>, L<Schedule::Load::Hosts::Host>
 
 =cut

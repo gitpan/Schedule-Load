@@ -1,5 +1,5 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.20 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: FakeReporter.pm,v 1.23 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -25,7 +25,7 @@ use POSIX;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 ######################################################################
 #### Local process table
@@ -148,8 +148,8 @@ Schedule::Load::FakeReporter - Distributed load reporting daemon
 
 =head1 DESCRIPTION
 
-C<Schedule::Load::FakeReporter> creates a
-C<Schedule::Load::Reporter::ProcessTable> similar to C<Proc::ProcessTable>,
+L<Schedule::Load::FakeReporter> creates a
+L<Schedule::Load::Reporter::ProcessTable> similar to L<Proc::ProcessTable>,
 which allows replacing the normal host information with special fixed
 information.  This allows the Schedule::Load facilities to be used to
 manage other resources, such as laboratory equipment, that has CPU like
@@ -159,18 +159,22 @@ Pctcpu is based on the load_limit or if unspecified, each fixed load counts
 as 100%.  Pid is the process ID that should be tracked on the current CPU,
 if this is not desired, add a pid_track=0 attribute.
 
-See C<Schedule::Load::Reporter> for most accessors.
-
-=head1 SEE ALSO
-
-C<Schedule::Load::Reporter>, C<slreportd>
+See L<Schedule::Load::Reporter> for most accessors.
 
 =head1 DISTRIBUTION
 
-This package is distributed via CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load::Reporter>, L<slreportd>
 
 =cut

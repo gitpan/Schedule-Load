@@ -1,5 +1,4 @@
-#!/usr/local/bin/perl -w
-# $Revision: 1.1 $$Date: 2004/02/26 21:40:14 $$Author: wsnyder $
+# $Revision: 1.3 $$Date: 2004/07/19 22:46:45 $$Author: wsnyder $
 # DESCRIPTION: Perl ExtUtils: Common routines required by package tests
 #
 # Copyright 1999-2003 by Wilson Snyder.  This program is free software;

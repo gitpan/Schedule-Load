@@ -24,7 +24,7 @@ install::
 	-chmod a+rw \$(RSCHLIB)/rschedule
 
 install-here::
-	make	RSCHLIB=/imports/nauticus/common/lib \\
+	make	RSCHLIB=/import/nauticus/common/lib \\
 		install
 
 install-test::

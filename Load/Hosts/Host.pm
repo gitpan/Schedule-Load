@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.33 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Host.pm,v 1.38 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 ######################################################################
 #### Globals
@@ -205,11 +205,12 @@ sub rating_cb {
     # Discount by cpus & frequency
     $rate /= $self->cpus;
     $rate /= $self->max_clock * 0.4;   # 1 free cpu at 300Mhz beat 50% of a 600 Mhz cpu
+    $rate *= ($self->get_undef('rating_mult') || 1.0);
 
     #printf "%f * (%d+%d+1) / %f / %f = %f\n", ($self->total_pctcpu+1), $self->report_load, $self->adj_load, $self->cpus, $self->max_clock, $rate if $Debug;
     return 0 if $rate<=0;
     $rate = log($rate);		# Make a more readable number
-    $rate += $self->rating_adder() if $self->get_undef('rating_adder');
+    $rate += ($self->get_undef('rating_adder') || 0);
     return $rate;
 }
 
@@ -338,7 +339,7 @@ number of physical cpus "/" the number of SMT cpus.
 
 =item holds
 
-Returns list of C<Schedule::Load::Hosts::Hold> objects, sorted by age.
+Returns list of L<Schedule::Load::Hosts::Hold> objects, sorted by age.
 
 =item hostname
 
@@ -377,7 +378,7 @@ System type from Perl build.
 =item top_processes
 
 Returns a reference to a list of top process objects,
-C<Schedule::Load::Hosts::Proc> to access the information for each process.
+L<Schedule::Load::Hosts::Proc> to access the information for each process.
 In an array context, returns a list; In a a scalar context, returns a
 reference to a list.
 
@@ -391,16 +392,20 @@ Total CPU percentage used by all processes.
 
 =back
 
-=head1 SEE ALSO
-
-C<Schedule::Load>, C<Schedule::Load::Hosts>, C<Schedule::Load::Hosts::Proc>
-
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<Schedule::Load::Hosts>, L<Schedule::Load::Hosts::Proc>
 
 =cut

@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.64 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Hosts.pm,v 1.68 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -19,7 +19,7 @@ require Exporter;
 @ISA = qw(Exporter);
 
 use Socket;
-use POSIX qw (EWOULDBLOCK BUFSIZ);
+use POSIX qw (EWOULDBLOCK EINTR EAGAIN BUFSIZ);
 use Schedule::Load qw(:_utils);
 use Schedule::Load::Hold;
 use Schedule::Load::Hosts::Host;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 ######################################################################
 #### Globals
@@ -542,9 +542,11 @@ sub _request {
     while (!$done) {
 	if ($self->{_inbuffer} !~ /\n/) {
 	    my $data = '';
+	    $!=undef;
 	    my $rv = $fh->sysread($data, POSIX::BUFSIZ, 0);
 	    $self->{_inbuffer} .= $data;
-	    $eof = 1 if !defined $rv || (length $data == 0);
+	    $eof = 1 if (!defined $rv || (length $data == 0))
+		&& ($! != POSIX::EINTR && $! != POSIX::EAGAIN);
 	    $done ||= $eof;
 	}
 
@@ -674,13 +676,13 @@ parameter if true (default) restarts reporter.
 
 =item hosts ()
 
-Returns the host objects, accessible with C<Schedule::Load::Hosts::Host>.
+Returns the host objects, accessible with L<Schedule::Load::Hosts::Host>.
 In an array context, returns a list; In a a scalar context, returns a
 reference to a list.
 
 =item hosts_match (...)
 
-Returns C<Schedule::Load::Hosts::Host> objects for every host that matches
+Returns L<Schedule::Load::Hosts::Host> objects for every host that matches
 the specified criteria.  Criteria are named parameters, as described in
 Schedule::Load::Schedule, of the following: classes specifies an arrayref
 of allowed classes.  match_cb is a routine returning true if this host
@@ -719,7 +721,7 @@ format.
 =item print_top
 
 Returns a string with the top jobs on all machines in a printable format,
-ala the C<top> program.
+ala the L<top> program.
 
 =item print_loads
 
@@ -744,18 +746,22 @@ The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 
 =back
 
-=head1 SEE ALSO
-
-C<Schedule::Load::Hosts::Host>, C<Schedule::Load::Hosts::Proc>
-
-C<Schedule::Load>, C<rschedule>
-
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<rschedule>
+
+L<Schedule::Load::Hosts::Host>, L<Schedule::Load::Hosts::Proc>
 
 =cut

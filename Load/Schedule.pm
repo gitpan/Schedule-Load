@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.39 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Schedule.pm,v 1.42 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.010';
+$VERSION = '3.020';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -370,7 +370,7 @@ when the daemon restarts the information will be lost.
 =head1 PARAMETERS
 
 Parameters for the new and fetch calls are shown in
-C<Schedule::Load::Hosts>.
+L<Schedule::Load::Hosts>.
 
 =over 4
 
@@ -384,16 +384,20 @@ live-locked out of getting anything!)
 
 =back
 
-=head1 SEE ALSO
-
-C<Schedule::Load>, C<Schedule::Load::Hosts>, C<rschedule>
-
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<Schedule::Load::Hosts>, L<rschedule>
 
 =cut

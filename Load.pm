@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.64 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Load.pm,v 1.67 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -38,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.010';
+$VERSION = '3.020';
 $Debug = 0;
 
 %_Default_Params = (
@@ -215,7 +215,7 @@ Schedule::Load - Load distribution and status across multiple host machines
 
 This package provides useful utilities for load distribution and status
 across multiple machines in a network.  To just see what is up in the
-network, see the C<rschedule> command.
+network, see the L<rschedule> command.
 
 The system is composed of four unix programs (each also with a underlying
 Perl module):
@@ -224,18 +224,18 @@ Perl module):
 
 =item rschedule
 
-C<rschedule> is a command line interface to this package.  It and the
-potential aliases C<rtop>, C<rhosts>, and C<rloads> report the current
-state of the network including hosts and top loading.  C<rschedule> also
+L<rschedule> is a command line interface to this package.  It and the
+potential aliases L<rtop>, L<rhosts>, and L<rloads> report the current
+state of the network including hosts and top loading.  L<rschedule> also
 allows reserving hosts and setting the classes of the machines, as
 described later.
 
 =item slchoosed
 
-C<slchoosed> is run on one host in the network.  This host is specified in
+L<slchoosed> is run on one host in the network.  This host is specified in
 the SLCHOOSED_HOST environment variable, which may also specify additional
 cold standby hosts in case the first host goes down.  Slchoosed collects
-connections from the C<slreportd> reporters, and maintains a internal
+connections from the L<slreportd> reporters, and maintains a internal
 database of the entire network.  User clients also connect to the chooser,
 which then gets updated information from the reporters, and returns the
 information to the user client.  As the chooser has the entire network
@@ -243,25 +243,25 @@ state, it can also choose the best host across all CPUs in the network.
 
 =item slreportd
 
-C<slreportd> must be running on every host in the network, usually started
-with a init.d script.  It reports itself to the C<slchoosed> daemon
+L<slreportd> must be running on every host in the network, usually started
+with a init.d script.  It reports itself to the L<slchoosed> daemon
 periodically, and is responsible for checking loading and top processes
 specific to the host that it runs on.
 
-C<slreportd> may also be invoked with some variables set.  This allows
+L<slreportd> may also be invoked with some variables set.  This allows
 static host information, such as class settings to be passed to
 applications.
 
 =item slpolice
 
-C<slpolice> is a optional client daemon which is run as a C<cron> job.
-When a user process has over a hour of CPU time, it C<nice>s that process
+L<slpolice> is a optional client daemon which is run as a L<cron> job.
+When a user process has over a hour of CPU time, it L<nice>s that process
 and sends mail to the user.  It is intended as a example which can be used
 directly or changed to suit the system manager preferences.
 
 =item lockerd
 
-C<lockerd> is part of the C<IPC::PidStat> package.  If running, it allows
+L<lockerd> is part of the L<IPC::PidStat> package.  If running, it allows
 the scheduler to automatically cancel held resources if the process that
 requested the resource exits or is even killed without cleaning up.
 
@@ -273,47 +273,47 @@ requested the resource exits or is even killed without cleaning up.
 
 =item Schedule::Load::Hosts
 
-C<Schedule::Load::Hosts> provides the connectivity to the C<slchoosed>
+L<Schedule::Load::Hosts> provides the connectivity to the L<slchoosed>
 daemon, and accessors to load and modify that information.
 
 =item Schedule::Load::Schedule
 
-C<Schedule::Load::Schedule> provides functions to choose the best host for
+L<Schedule::Load::Schedule> provides functions to choose the best host for
 a new job, reserving hosts, and for setting what hosts specific classes of
 jobs can run on.
 
 =item Schedule::Load::Reporter
 
-C<Schedule::Load::Reporter> implements the internals of C<slreportd>.
+L<Schedule::Load::Reporter> implements the internals of L<slreportd>.
 
 =item Schedule::Load::Chooser
 
-C<Schedule::Load::Chooser> implements the internals of C<slchoosed>.
+L<Schedule::Load::Chooser> implements the internals of L<slchoosed>.
 
 =back
 
 =head1 RESERVATIONS
 
 Occasionally clusters have members that are only to be used by specific
-people, and not for general use.  A host may be reserved with C<rschedule
+people, and not for general use.  A host may be reserved with L<rschedule
 reserve>.  This will place a special comment on the machine that
-C<rschedule hosts> will show.  Reservations also prevent the
-C<Schedule::Load::Schedule> package from picking that host as the best
+L<rschedule hosts> will show.  Reservations also prevent the
+L<Schedule::Load::Schedule> package from picking that host as the best
 host.
 
 To be able to reserve a host, the reservable variable must be set on that
-host.  This is generally done when C<slreportd> is invoked on the
-reservable host by using C<slreportd reservable=1>.
+host.  This is generally done when L<slreportd> is invoked on the
+reservable host by using L<slreportd reservable=1>.
 
 =head1 CLASSES
 
 Different hosts often have different properties, and jobs need to be able
 select a host with certain properties, such as hardware or licensing
 requirements.  Classes are generally just boolean variables which start
-with class_.  Classes can be specified when C<slreportd> is invoked on the
-C<slreportd class_foo=1>.  The class setting may be seen with C<rschedule
+with class_.  Classes can be specified when L<slreportd> is invoked on the
+L<slreportd class_foo=1>.  The class setting may be seen with L<rschedule
 classes> or may be read (as may any other variable) as a accessor from a
-C<Schedule::Load::Hosts::Host> object.
+L<Schedule::Load::Hosts::Host> object.
 
 Once a class is defined, a scheduling call can include it the classes array
 that is passed when the best host is requested.  Only machines which match
@@ -321,11 +321,11 @@ one of those classes will be selected.
 
 =head1 COMMAND COMMENTS
 
-C<rschedule loads> or C<rloads> show the command that is being run.  By
+L<rschedule loads> or L<rloads> show the command that is being run.  By
 default this is the basename of the command invoked, as reported by the
 operating system.  Often this is of little use, especially when the same
-program is used by many people.  The C<rschedule cmnd_comment> command or
-C<Schedule::Load::Schedule::cmnd_comment> function will assign a more
+program is used by many people.  The L<rschedule cmnd_comment> command or
+L<Schedule::Load::Schedule::cmnd_comment> function will assign a more
 verbose command to that process id.  For example, we use dc_shell, and put
 the name of the module being compiled into the comment, so rather then
 several copies of the generic "dc_shell" we see "dc module", "dc module2",
@@ -341,23 +341,23 @@ host, and enough CPU time elapses for that new process to claim CPU time.
 For a this limited time, the load on the host will be incremented.  When
 the job begins and a little CPU time has elapsed the hold is released with
 a hold_release call, the timer expiring, or IPC::PidStat detecting the
-holding process died.  This will cause the load reported by C<rschedule
+holding process died.  This will cause the load reported by L<rschedule
 hosts> to occasionally be higher then the number of jobs on that host.
 
 =head1 FIXED LOADS
 
 Some jobs have CPU usage patterns which contain long periods of low CPU
-activity, such as when doing disk IO.  C<make> is a typical example; the
+activity, such as when doing disk IO.  L<make> is a typical example; the
 parent make process uses little CPU time, but the children of the make pop
 in and out of the CPU run list.
 
 When scheduling, it is useful to have such jobs always count as one (or
 more) job, so that the idle time is not misinterpreted and another job
 scheduled onto that machine.  Fixed loading allows all children of a given
-parent to count as a given fixed CPU load.  Using C<make> again, if the
+parent to count as a given fixed CPU load.  Using L<make> again, if the
 parent make process is set as a fixed_load of one, the make and all
 children will always count as one load, even if not consuming CPU
-resources.  The C<rschedule loads> or C<rloads> command includes not only
+resources.  The L<rschedule loads> or L<rloads> command includes not only
 top CPU users, but also all fixed loads.  If a child process is using CPU
 time, that is what is displayed.  If no children are using appreciable CPU
 time (~2%), the parent is the one shown in the loads list.
@@ -378,7 +378,7 @@ On all the hosts in the network you wish to schedule onto, check
 SLCHOOSED_HOST is set appropriately, then run slreportd.  Optionally run
 pidstatd (from IPC::Locker) on these hosts also.
 
-The C<rschedule hosts> command should now show your hosts.
+The L<rschedule hosts> command should now show your hosts.
 
 If you run slreportd before slchoosed, there may be a 60 second wait before
 slreportd detects the new slchoosed process is running.  During this time
@@ -386,26 +386,35 @@ rschedule won't show all of the hosts.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@wsnyder.org>
 
 =head1 SEE ALSO
 
 User program for viewing loading, etc:
 
-C<rschedule>
+L<rschedule>, L<slrsh>, L<slpolice>
 
 Daemons:
 
-C<slreportd>, C<slchoosed>, C<slpolice>
+L<slreportd>, L<slchoosed>, L<slpolice>
 
 Perl modules:
 
-C<Schedule::Load::Chooser>, C<Schedule::Load::Hosts::Host>,
-C<Schedule::Load::Hosts::Proc>, C<Schedule::Load::Hosts>,
-C<Schedule::Load::Reporter>, C<Schedule::Load::Schedule>
-
-=head1 AUTHORS
-
-Wilson Snyder <wsnyder@wsnyder.org>
+L<Schedule::Load::Chooser>, 
+L<Schedule::Load::FakeReporter>, 
+L<Schedule::Load::Hosts>,
+L<Schedule::Load::Hosts::Host>,
+L<Schedule::Load::Hosts::Proc>, 
+L<Schedule::Load::Reporter>,
+L<Schedule::Load::ResourceReq>,
+L<Schedule::Load::Schedule>
 
 =cut

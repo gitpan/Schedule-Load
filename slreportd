@@ -1,7 +1,7 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.28 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: slreportd,v 1.32 2004/09/08 14:28:29 ws150726 Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -136,7 +136,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.28 2004/03/04 16:33:58 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.32 2004/09/08 14:28:29 ws150726 Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -144,7 +144,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.28 2004/03/04 16:33:58 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.32 2004/09/08 14:28:29 ws150726 Exp $ ';
     print "\n";
     exit (1);
 }
@@ -178,12 +178,12 @@ slreportd will start a daemon to report machine loading for the
 Schedule::Load package.  It will create two similar processes, so that if
 second process exits, the first may restart it automatically.
 
-C<slreportd> must be running on every host in the network, usually started
-with a init.d script.  It reports itself to the C<slchoosed> daemon
+L<slreportd> must be running on every host in the network, usually started
+with a init.d script.  It reports itself to the L<slchoosed> daemon
 periodically, and is responsible for checking loading and top processes
 specific to the host that it runs on.
 
-C<slreportd> may also be invoked with some variables set.  This allows
+L<slreportd> may also be invoked with some variables set.  This allows
 static host information, such as class settings to be passed to
 applications.
 
@@ -236,21 +236,36 @@ with specific properties.
 
 Set a maximum number of jobs that the scheduler can run on this machine.
 
-=back
+=item rating_adder={value}
+
+Add the specified value to the rating obtained for the machine.  A positive
+rating will make the machine less desirable for scheduling.
+
+=item rating_mult={value}
+
+Multiply the specified value to the rating obtained for the machine.  The
+value 2 would act the same as a halved clock frequency, making the machine
+less desirable for scheduling.
 
 =back
 
-=head1 SEE ALSO
-
-C<slchoosed>, C<Schedule::Load>, C<Schedule::Load::Server>, C<Schedule::Load::Reporter>, 
+=back
 
 =head1 DISTRIBUTION
 
-This package is distributed via CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<slchoosed>, L<Schedule::Load>, L<Schedule::Load::Reporter>, 
 
 =cut
 ######################################################################

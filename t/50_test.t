@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 50_test.t,v 1.1 2004/02/26 21:40:14 wsnyder Exp $
+#$Id: 50_test.t,v 1.2 2004/07/19 22:45:59 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -74,12 +74,12 @@ mkdir ('test_store', 0777);
 # Start servers
 
 if (!$Manual_Server_Start) {
-    start_server ("./slchoosed --nofork");
+    start_server ("$PERL ./slchoosed --nofork");
     sleep 1;
-    start_server ("./slreportd class_verilog=1 reservable=1 --nofork"
+    start_server ("$PERL ./slreportd class_verilog=1 reservable=1 --nofork"
 		  # Stored filename must be absolute as deamon chdir's
 		  ." --stored_filename=".getcwd()."/test_store/".hostname());
-    start_server ("./slreportd --fake hostname=fakehost class_verilog=1 reservable=1 --nofork"
+    start_server ("$PERL ./slreportd --fake hostname=fakehost class_verilog=1 reservable=1 --nofork"
 		  # Stored filename must be absolute as deamon chdir's
 		  ." --stored_filename=".getcwd()."/test_store/".hostname());
     sleep 5;

@@ -1,6 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $
+# $Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -16,12 +16,12 @@
 
 require 5.004;
 use lib 'blib/lib';	# testing
-use English;
 use Getopt::Long;
 use Sys::Hostname;
 use Pod::Text;
 use Schedule::Load;
 use Schedule::Load::Schedule;
+use Config;
 
 ######################################################################
 # configuration
@@ -40,6 +40,7 @@ my $opt_fixed_load = 1;	# For fixedload
 my @opt_classes = ();
 my $opt_comment;
 my $opt_kill;
+my $opt_similar;
 my $opt_host = hostname();
 
 if ($0 =~ /(^|[\\\/])rtop$/) {
@@ -66,10 +67,20 @@ $result = &GetOptions (
 		       "load=i"		=> \$opt_fixed_load,
 		       "comment=s"	=> \$opt_comment,
 		       "kill:i"		=> \$opt_kill,
+		       "similar!"	=> \$opt_similar,
 		       "<>"		=> \&cmd,
 		       );
 
 if (!$result) { &usage(); }
+
+my @match_params = (classes=>\@opt_classes);
+if ($opt_similar) {
+    push @match_params,
+    (match_cb=>('sub { return 1'
+		.'&& ($_[0]->get_undef(qw(archname)) eq \''.$Config{archname}."')"
+		.'&& ($_[0]->get_undef(qw(osvers)) eq \''.$Config{osvers}."')"
+		.'; }'));
+}
 
 # Fetch just once for speed
 $scheduler = Schedule::Load::Schedule->fetch(%server_params);
@@ -136,13 +147,13 @@ sub cmd {
     } elsif ($param eq "hosts") {
 	push @commands, sub { print $scheduler->print_hosts; };
     } elsif ($param eq "idle_host_names") {
-	push @commands, sub { print join(' ',$scheduler->idle_host_names(classes=>\@opt_classes,)),"\n"; };
+	push @commands, sub { print join(' ',$scheduler->idle_host_names(@match_params,)),"\n"; };
     } elsif ($param eq "holds") {
 	push @commands, sub { print $scheduler->print_holds; };
     } elsif ($param eq "hostnames") {
-	push @commands, sub { print join(' ',$scheduler->hostnames(classes=>\@opt_classes,)),"\n"; };
+	push @commands, sub { print join(' ',$scheduler->hostnames(@match_params,)),"\n"; };
     } elsif ($param eq "jobs") {
-	push @commands, sub { print $scheduler->jobs(classes=>\@opt_classes,),"\n"; };
+	push @commands, sub { print $scheduler->jobs(@match_params,),"\n"; };
     } elsif ($param eq "loads") {
 	if (defined $opt_kill) {
 	    push @commands, sub { print $scheduler->print_kills(signal=>$opt_kill); };
@@ -193,13 +204,13 @@ sub cmd {
 	$Last_Cmd = $param;
     } elsif ($param eq "best") {
 	push @commands, sub {
-	    my $val = $scheduler->best(classes=>\@opt_classes, );
+	    my $val = $scheduler->best(@match_params, );
 	    print "$val\n" if (defined $val);
 	    die "%Error: No best host found\n" if (!defined $val);
 	};
     } elsif ($param eq "best_or_none") {
 	push @commands, sub {
-	    my $val = $scheduler->best(classes=>\@opt_classes, allow_none=>1,);
+	    my $val = $scheduler->best(@match_params, allow_none=>1,);
 	    print "$val\n" if (defined $val);
 	    die "%Error: No host as low enough loading\n" if (!defined $val);
 	};
@@ -215,7 +226,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -223,7 +234,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.36 2004/01/27 19:03:50 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $ ';
     print "\n";
     exit (1);
 }
@@ -363,7 +374,7 @@ Releases a host from dedicated use.  Use --host to specify which host.
 =item reserve
 
 Reserves a host for dedicated use.  To be reservable the C<reservable> flag
-must be set when that host's C<slreportd> is invocated.  This is indicated
+must be set when that host's L<slreportd> is invocated.  This is indicated
 on the top report by a "R" in the column next to the command.  To override
 a existing reservation you need to release the reservation first.  Use
 --host to specify which host.  A optional --comment specifies the
@@ -396,19 +407,24 @@ Displays a listing of top processes across all hosts being monitored.
 
 =over 4
 
-=item --help
+=item --class <class>
 
-Displays this message and program version and exits.
+Specifies the job class for the best, best_or_none, hostnames,
+idle_host_names, and jobs commands.
 
-=item --port <portnumber>
+=item --comment <comment>
 
-Specifies the port number that slchoosed uses.
+Specifies the command comment for the cmnd_comment command.
 
 =item --dhost <hostname>
 
 Specifies the host name that slchoosed uses.  May be specified multiple
 times to specify backup hosts.  Defaults to SLCHOOSED_HOST environment
 variable, which contains colon separated host names.
+
+=item --help
+
+Displays this message and program version and exits.
 
 =item --kill <signal>
 
@@ -420,13 +436,15 @@ signal name.
 
 Specifies the load value for the fixed_load command, defaults to 1.
 
-=item --comment <comment>
+=item --port <portnumber>
 
-Specifies the command comment for the cmnd_comment command.
+Specifies the port number that slchoosed uses.
 
-=item --class <class>
+=item --similar
 
-Specifies the job class for the best command.
+Specifies only machines with the same OS version as the current host should
+be returned for the best, best_or_none, hostnames, idle_host_names, and
+jobs commands.
 
 =item --version
 
@@ -434,13 +452,17 @@ Displays program version and exits.
 
 =back
 
-=head1 SEE ALSO
-
-C<Schedule::Load>
-
 =head1 DISTRIBUTION
 
-This package is distributed via CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
+
+=head1 SEE ALSO
+
+L<Schedule::Load>
 
 =head1 AUTHORS
 

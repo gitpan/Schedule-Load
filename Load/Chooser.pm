@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.58 2004/03/04 16:33:58 wsnyder Exp $
+# $Id: Chooser.pm,v 1.64 2004/10/26 17:12:16 ws150726 Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.010';
+$VERSION = '3.020';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -241,8 +241,14 @@ sub _client_service {
     
     my $fh = $client->{socket};
     my $data = '';
-    my $rv = $fh->sysread($data, POSIX::BUFSIZ);
-    if (!defined $rv || (length $data == 0)) {
+    my $rv;
+    while (1) {
+	$! = undef;
+	$rv = $fh->sysread($data, POSIX::BUFSIZ);
+	last if $! != POSIX::EINTR && $! != POSIX::EAGAIN;
+    }
+    if (!defined $rv || (length $data == 0))
+    {
 	# End of the file
 	_client_close ($client);
 	return;
@@ -563,7 +569,7 @@ sub _schedule_one_resource {
     #Factors:
     #  hosts_match:  reserved, match_cb, classes
     #	   -> Things that absolutely must be correct to schedule here
-    #  rating:	     load_limit, cpus, clock, adj_load, tot_pctcpu, rating_adder
+    #  rating:	     load_limit, cpus, clock, adj_load, tot_pctcpu, rating_adder, rating_mult
     #	   -> How to prioritize, if 0 it's overbooked
     #  loads_avail:  holds, fixed_load
     #	   -> How many more jobs host can take before we should turn off new jobs
@@ -833,7 +839,7 @@ Schedule::Load::Chooser - Distributed load choosing daemon
 
 =head1 DESCRIPTION
 
-C<Schedule::Load::Chooser> on startup creates a daemon that clients can
+L<Schedule::Load::Chooser> on startup creates a daemon that clients can
 connect to using the Schedule::Load package.
 
 =over 4
@@ -842,7 +848,11 @@ connect to using the Schedule::Load package.
 
 Starts the chooser daemon.  Does not return.
 
+=back
+
 =head1 PARAMETERS
+
+=over 4
 
 =item port
 
@@ -854,16 +864,22 @@ The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 Seconds after which if a client doesn't respond to a ping, it is considered
 dead.
 
-=head1 SEE ALSO
-
-C<Schedule::Load>, C<slchoosed>
+=back
 
 =head1 DISTRIBUTION
 
-This package is distributed via CPAN.
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
 
 =head1 AUTHORS
 
 Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<Schedule::Load>, L<slchoosed>
 
 =cut

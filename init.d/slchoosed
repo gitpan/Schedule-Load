@@ -4,6 +4,10 @@
 # Copyright 2002-2004 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
+#
+# chkconfig: 23456 99 10
+# description: Slchoosed provides clump-wide scheduling services for Schedule::Load
+# processname: slchoosed
 
 state=$1
 
