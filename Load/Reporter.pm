@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.36 2002/09/24 13:15:07 wsnyder Exp $
+# $Id: Reporter.pm,v 1.39 2003/04/15 15:00:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -48,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.102';
+$VERSION = '2.104';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -82,6 +82,7 @@ sub start {
 	#Undocumented
 	timeout=>$Debug?2:30,		# Sec before host socket connect times out
 	alive_time=>$Debug?10:30,	# Sec to send alive message
+	const_changed=>0,		# const or stored has changed, update in chooser
 	@_};
     bless $self, $class;
 
@@ -192,8 +193,10 @@ sub _open_host {
     $self->{socket} = undef if (!$fh || !$fh->connected());
     if ($self->{socket}) {
 	# Send constants to the host, that will tell it we live
-	$self->_send_hash('const');
+	$self->{const_changed} = 1;
+	$self->{const}{_update} = 0;
 	$self->_fill_and_send;
+	$self->{const}{_update} = 1;   # So chooser can skip calling start function
     }
     print "   Host $host $self->{port} is ".($self->{socket}?"up":"down")."!\n" if $Debug;
     return $self->{socket};
@@ -220,7 +223,11 @@ sub _fill_and_send {
     # Fill dynamic values and send
     $self->_fill_stored;
     $self->_fill_dynamic;
-    $self->_send_hash('stored');
+    if ($self->{const_changed}) {
+	$self->{const_changed} = 0;
+	$self->_send_hash('const');
+	$self->_send_hash('stored');
+    }
     # Dynamic must be last, it triggers sending info back to user
     $self->_send_hash('dynamic');	
 }
@@ -229,6 +236,7 @@ sub _fill_const {
     my $self = shift;
     # fill constant values into self
     # (Values that don't change with loading -- known at startup)
+    $self->{const_changed} = 1;
  
     # Load our required keys
     $self->{const}{cpus}      ||= Unix::Processors->max_online();
@@ -483,6 +491,7 @@ sub _fill_stored {
 	    print "Retrieve $self->{stored_filename}\n" if $Debug;
 	    $self->{stored} = retrieve($self->{stored_filename});
 	}
+	$self->{const_changed} = 1;
 	$self->{stored_read} = 1;
     }
 }
@@ -493,15 +502,21 @@ sub _set_stored {
     # Set a stored field to a given value
     
     $self->_fill_stored();	# Make sure up-to-date
+    $self->{const_changed} = 1;
 
     foreach my $var (keys %{$params}) {
 	my $value = $params->{$var};
 	next if $var eq "host";
 	print "_set_const($var = $value)\n" if $Debug;
-	$self->{stored}{$var} = $value;
+	if ($params->{set_const}) {
+	    $self->{const}{$var} = $value;
+	} else {
+	    $self->{stored}{$var} = $value;
+	}
     }
     
-    if (defined $self->{stored_filename}) {
+    if (!$params->{set_const}
+	&& defined $self->{stored_filename}) {
 	print "Store $self->{stored_filename}\n" if $Debug;
 	nstore $self->{stored}, $self->{stored_filename};
 	chmod 0666, $self->{stored_filename};

@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.27 2002/09/24 13:15:07 wsnyder Exp $
+# $Id: Schedule.pm,v 1.30 2003/04/15 15:00:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -37,7 +37,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '2.102';
+$VERSION = '2.104';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -208,7 +208,7 @@ sub _scheduler_params {
 		      hold_time=> $self->{hold_time},
 		      hold_key=>  undef,
 		      hold_load=> 1,
-		      max_jobs=>  ($is_night ? -1  : -0.2 ),
+		      max_jobs=>  ($is_night ? -1  : -0.5 ),
 		      @_ };
     # Take a ref to list of classes and add class_ and any night time options
     # Return ref to hash with scheduler options: classes and is_night
@@ -234,6 +234,7 @@ sub set_stored {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts)';
     my $params = {
 	host=>undef,
+	#set_const=>undef,	# If true, put into constant rather then stored data
 	@_,};
 
     print __PACKAGE__."::set_stored($params->{host})\n" if $Debug;
@@ -323,6 +324,13 @@ release does not have to be the same user that reserved the host.
 Reserves the machine for exclusive use of the current user.  The host
 choosen must have the reservable flag set.  C<rschedule hosts> will show
 the host as reserved, along with the provided comment.
+
+=item set_stored (host=>hostname, [set_const=>1], [key=>value])
+
+Set a key/value parameter on the persistant storage on the remote server,
+such as if a class is allowed on that host.  With const=>1, don't make it
+persist, but make it look like the deamon was started with that option;
+when the deamon restarts the information will be lost.
 
 =back
 

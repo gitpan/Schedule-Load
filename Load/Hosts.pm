@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.43 2002/09/24 13:15:07 wsnyder Exp $
+# $Id: Hosts.pm,v 1.50 2003/04/15 15:00:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -41,7 +41,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.102';
+$VERSION = '2.104';
 
 ######################################################################
 #### Globals
@@ -159,19 +159,39 @@ sub cpus {
     return $jobs;
 }
 
+sub hostnames {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
+    my %params = @_;
+    # Return hostnames, potentially matching given classes
+    my @hnames;
+    foreach my $host ($self->hosts) {
+	if ($host->classes_match ($params{classes})) {
+	    push @hnames, $host->hostname;
+	}
+    }
+    @hnames = (sort @hnames);
+    return (wantarray ? @hnames : \@hnames);
+}
+
 sub idle_host_names {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
     my %params = @_;
     # Return idle hosts, potentially matching given classes
     # Roughly scaled so even powered hosts have even representation
 
-    $self->_fetch_if_unfetched;
     my @hnames;
-    foreach my $host (values %{$self->{hosts}}) {
-	if ($host->exists('hostname') && $host->hostname
-	    && $host->classes_match ($params{classes})
+    foreach my $host ($self->hosts) {
+	if ($host->classes_match ($params{classes})
 	    && !$host->reserved) {
-	    my $idleCpus = $host->cpus - $host->adj_load;
+	    my $idleCpus = $host->cpus;
+	    if ($params{ign_pctcpu}) {
+	    } elsif ($params{by_pctcpu}) {  # min of adj_load or percentage
+		my $adj = (($host->cpus * $host->total_pctcpu / 100) - 0.2);  # 80% used? squeeze another in
+		$adj = 0 if $adj<0;
+		$idleCpus -= $adj;
+	    } else {
+		$idleCpus -= $host->adj_load
+	    }
 	    for (my $c=0; $c<$idleCpus; $c++) {
 		push @hnames, $host->hostname;
 	    }
@@ -204,7 +224,7 @@ sub print_hosts {
     foreach my $host ( @{$hosts->hosts} ){
 	my $ostype = $host->archname ." ". $host->osvers;
 	foreach (sort ($host->fields)) {
-	    $ostype .= " $_" if (/^lab_/);
+	    $ostype .= " $_";
 	}
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
 	$out.=sprintf ($FORMAT,
@@ -213,11 +233,31 @@ sub print_hosts {
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
 		       $host->adj_load, 
-		       ( ($host->rating && !$host->reserved)
-			 ?sprintf("%4.2f", $host->rating):"inf"), 
+		       $host->rating_text,
 		       ( ($host->reservable?"R":" ")
 			 . digit($host,'load_limit')),
 		       $ostype,
+		       );
+    }
+    return $out;
+}
+
+sub print_status {
+    my $hosts = shift;
+    # Daemon status, mostly for debugging
+    my $out = "";
+    (my $FORMAT =           "%-12s  %6s%%     %5s     %5s    %-17s          %s\n") =~ s/\s\s+/ /g;
+    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DAEMON STATUS");
+    foreach my $host ( @{$hosts->hosts} ){
+	my $t = localtime($host->slreportd_connect_time);
+	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
+	$out.=sprintf ($FORMAT,
+		       $host->hostname, 
+		       sprintf("%3.1f", $host->total_pctcpu), 
+		       $host->adj_load, 
+		       $host->rating_text,
+		       $tm,
+		       $host->slreportd_status,
 		       );
     }
     return $out;
@@ -272,15 +312,19 @@ sub print_loads {
 
 sub print_kills {
     my $hosts = shift;
+    my $params = {
+	signal=>0,
+	@_,};
     # Top processes
     my $out = "";
-    (my $FORMAT =           "ssh %-12s kill %6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "ssh %-12s kill %s%6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
 	    $out.=sprintf ($FORMAT, 
 			   $host->hostname,
+			   ($params->{signal}?"-$params->{signal} ":""),
 			   $p->pid, 
 			   $p->uname, 		$p->time_hhmm,
 			   sprintf("%3.1f", $p->pctcpu),
@@ -299,20 +343,32 @@ sub print_classes {
     my @classes = (sort ($hosts->classes()));
     my $classnum = 0;
     my %class_letter = ();
+    my @col_width = ();
     foreach my $class (@classes) {
 	$class_letter{$class} = chr($classnum%26+ord("a"));
+	$col_width[$classnum] = 1;
+	foreach my $host ( @{$hosts->hosts} ){
+	    my $val = $host->get_undef($class);
+	    if ($val) {
+		$col_width[$classnum] = length $val if $col_width[$classnum] < length $val;
+	    }
+	}
 	$classnum++;
     }
+
     my $classes = $classnum;
     $classnum = 0;
     foreach my $class (@classes) {
-	$class_letter{$class} = chr($classnum%26+ord("a"));
-	$out.=sprintf ("%-12s  %s%s%s%s- %s\n",
-		       ($classnum==$classes-1)?"HOST":"", 
-		       "| "x$classnum, 
-		       $class_letter{$class}, "--"x($classes-$classnum-1),
-		       $class_letter{$class},
-		       $class);
+	$out.=sprintf ("%-12s ", ($classnum==$classes-1)?"HOST":"");
+	for (my $prtclassnum = 0; $prtclassnum<$classnum; $prtclassnum++) {
+	    $out .= (" "x$col_width[$prtclassnum])."|";
+	}
+	$out .= (" "x$col_width[$classnum]).$class_letter{$class};
+	for (my $prtclassnum = $classnum+1; $prtclassnum<$#classes; $prtclassnum++) {
+	    $out .= ("-"x$col_width[$prtclassnum])."-";
+	}
+	$out.= "-$class_letter{$class}" if $classnum!=$classes-1;
+	$out.=sprintf ("- %s\n", $class);
 	$classnum++;
     }
     foreach my $host ( @{$hosts->hosts} ){
@@ -320,13 +376,15 @@ sub print_classes {
 	$classnum = 0;
 	foreach my $class (@classes) {
 	    my $val = $host->get_undef($class);
+	    my $chr = ".";
 	    if ($val && $val > 1) {
-		$out .= sprintf (" %d", $val);
+		$chr = $val;
 	    } elsif ($val) {
-		$out .= sprintf (" %s", $class_letter{$class});
+		$chr = $class_letter{$class};
 	    } else {
-		$out .= sprintf (" .");
+		$chr = ".";
 	    }
+	    $out .= sprintf (" %$col_width[$classnum]s", $chr);
 	    $classnum++;
 	}
 	$out .= "\n";

@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.38 2002/09/24 13:15:07 wsnyder Exp $
+# $Id: Chooser.pm,v 1.42 2003/04/15 15:00:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -47,7 +47,10 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.102';
+$VERSION = '2.104';
+
+use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
+use constant RECONNECT_NUMBER  => 5;
 
 ######################################################################
 #### Globals
@@ -231,6 +234,7 @@ sub _client_service {
     $client->{ping} = $Time;
 
     while ($client->{inbuffer} =~ s/^([^\n]*)\n//) {
+	next if $client->{_broken};
 	my $line = $1;
 	#print "CHOOSER GOT: $line\n" if $Debug;
 	print "$TimeStr $client->{host}{hostname}  " if ($Debug && $client->{host});
@@ -239,7 +243,9 @@ sub _client_service {
 	if ($cmd eq "report_ping") {
 	    # NOP, timestamp recorded above
 	} elsif ($cmd eq "report_const") {
-	    _host_const ($client, $params);
+	    # Older reporters don't have the _update flag, so support them too
+	    _host_start ($client, $params) if !$params->{_update};
+	    _host_dynamic ($client, "const", $params) if !$client->{_broken};
 	} elsif ($cmd eq "report_stored") {
 	    _host_dynamic ($client, "stored", $params);
 	} elsif ($cmd eq "report_dynamic") {
@@ -309,17 +315,11 @@ sub _client_ping_timecheck {
 ######################################################################
 #### Services for slreportd calls
 
-sub _host_const {
+sub _host_start {
     my $client = shift || die;
     my $params = shift;
     # const command: establish a new host, load constants
     my $hostname = $params->{hostname};
-
-    # Remove any earlier connection
-    if (defined $Hosts->{hosts}{$hostname}{client}) {
-	print "$TimeStr $hostname was connected before, reconnected\n" if $Debug;
-	_client_close($Hosts->{hosts}{$hostname}{client});
-    }
 
     # Only sent at first establishment, so we blow away old info
     print "$TimeStr Connecting $hostname\n" if $Debug;
@@ -330,6 +330,31 @@ sub _host_const {
 		  const => $params,
 	      };
     bless $host, "Schedule::Load::Hosts::Host";
+
+    $host->{const}{slreportd_connect_time} = time();
+    $host->{const}{slreportd_status} = "Connected";
+
+    # Remove any earlier connection
+    my $oldhost = $Hosts->{hosts}{$hostname};
+    if (defined $oldhost->{client}) {
+	print "$TimeStr $hostname was connected before, reconnected\n" if $Debug;
+	if ($host->{const}{slreportd_connect_time}
+	    < ($oldhost->{const}{slreportd_connect_time} + RECONNECT_TIMEOUT)) {
+	    $host->{const}{slreportd_status} = "Reconnected";
+	    $host->{const}{slreportd_reconnects} = ($oldhost->{const}{slreportd_reconnects}||0)+1;
+	    if ($host->{const}{slreportd_reconnects} > RECONNECT_NUMBER) {
+		# We have two reporters fighting.  Tell what's up and ignore all data.
+		my $cmt = ("%Error: Conflicting slreportd deamons on ".$oldhost->slreportd_hostname
+			   ." and ".$host->slreportd_hostname);
+		$oldhost->{const}{slreportd_status} = $cmt;
+		$oldhost->{stored}{reserved} = $cmt;
+		$host->{client}{_broken} = 1;
+		$client->{_broken} = 1;
+		return;
+	    }
+	    _client_close($oldhost->{client});
+	}
+    }
 
     tie %{$host->{waiters}}, 'Tie::RefHash';
     $Hosts->{hosts}{$hostname} = $host;
@@ -545,11 +570,10 @@ sub _schedule {
 	$jobs = _min($jobs, $schparams->{max_jobs});
     }
     $jobs = _min($jobs, $freejobs);
-    $jobs = _max($jobs, 1);
-
-    if ($schparams->{allow_none} && !$freecpu) {
+    if ($schparams->{allow_none} && (!$freecpu || $jobs<1)) {
 	$bestref = undef;
     }
+    $jobs = _max($jobs, 1);
 
     if ($bestref && $schparams->{hold_key}) {
 	$Holds{$schparams->{hold_key}} = {

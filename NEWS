@@ -6,6 +6,20 @@ The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
+* Changes in Schedule::Load 2.104 4/15/2003
+
+***	Added rschedule set_const function.
+
+***	Added rschedule status function.
+
+****	rloads --kill now takes signal name argument.
+
+****	Reserve a machine with a error message if conflicting deamons
+	are running with the same hostname.
+
+****	Fix 'rschedule classes' display with class numbers over 1 digit
+
+
 * Changes in Schedule::Load 2.102 9/24/2002
 
 ***	Added rating_cb to scheduler to allow users to specify algorithm
@@ -102,7 +116,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.31 2002/09/24 13:15:07 wsnyder Exp $
+$Id: NEWS,v 1.36 2003/04/15 15:00:07 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

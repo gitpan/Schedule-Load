@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.17 2002/08/30 17:09:19 wsnyder Exp $
+# $Id: slpolice,v 1.18 2002/11/05 23:28:20 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -61,7 +61,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.17 2002/08/30 17:09:19 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.18 2002/11/05 23:28:20 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -191,7 +191,7 @@ sub complain {
 		    $subj = $procref->{many_subject};
 		}
 		if ($newtopic) {
-		    my $newtopic = 0;
+		    $newtopic = 0;
 		    $body .= "\n";
 		    $body .= $procref->{body_header};
 		    $body .= "\n";

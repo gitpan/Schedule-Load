@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.23 2002/09/24 13:15:07 wsnyder Exp $
+# $Id: Host.pm,v 1.28 2003/04/15 15:00:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -36,7 +36,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '2.102';
+$VERSION = '2.104';
 
 ######################################################################
 #### Globals
@@ -174,7 +174,10 @@ sub rating_cb {
     $rate /= $self->max_clock * 0.4;   # 1 free cpu at 300Mhz beat 50% of a 600 Mhz cpu
 
     #printf "%f * (%d+%d+1) / %f / %f = %f\n", ($self->total_pctcpu+1), $self->report_load, $self->adj_load, $self->cpus, $self->max_clock, $rate if $Debug;
-    return ($rate>0)?log($rate):0;	# Make a more readable number
+    return 0 if $rate<=0;
+    $rate = log($rate);		# Make a more readable number
+    $rate += $self->rating_adder() if $self->get_undef('rating_adder');
+    return $rate;
 }
 
 sub rating {
@@ -182,6 +185,13 @@ sub rating {
     my $subref = shift;
     return $self->rating_cb() if !defined $subref;  # Null reference means default callback
     return $self->_eval_generic_cb($subref);
+}
+
+sub rating_text {
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->rating(subroutine)';
+    return "inf" if $self->reserved;
+    return "inf" if !$self->rating;
+    return sprintf("%4.2f", $self->rating);
 }
 
 ######################################################################
@@ -195,13 +205,17 @@ sub AUTOLOAD {
     return if $field eq "DESTROY";
   
     if (exists ($self->{dynamic}{$field})) {
-	eval "sub $field { my \$self=shift; return \$self->{dynamic}{$field}; }";
+	# Dynamic variables stay dynamic
+	eval "sub $field { return \$_[0]->{dynamic}{$field}; }";
 	return $self->{dynamic}{$field};
     } elsif (exists ($self->{stored}{$field})) {
-	eval "sub $field { my \$self=shift; return \$self->{stored}{$field}; }";
+	# Stored variables can move to/from const variables
+	eval "sub $field { return (exists \$_[0]->{stored}{$field} "
+	    ."? \$_[0]->{stored}{$field} : \$_[0]->{const}{$field}); }";
 	return $self->{stored}{$field};
     } elsif (exists ($self->{const}{$field})) {
-	eval "sub $field { my \$self=shift; return \$self->{const}{$field}; }";
+	eval "sub $field { return (exists \$_[0]->{stored}{$field} "
+	    ."? \$_[0]->{stored}{$field} : \$_[0]->{const}{$field}); }";
 	return $self->{const}{$field};
     } else {
 	croak "$type->$field: Unknown ".__PACKAGE__." field $field";
