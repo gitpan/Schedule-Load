@@ -1,19 +1,21 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.34 2000/01/18 00:46:16 wsnyder Exp $
+# $Id: Load.pm,v 1.36 2000/01/21 14:26:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public Load
-# as published by the Free Software Foundation; either version 2
-# of the Load, or (at your option) any later version.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of either the GNU General Public License or the
+# Perl Artistic License, with the exception that it cannot be placed
+# on a CD-ROM or similar media for commercial distribution without the
+# prior approval of the author.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public Load for more details.
+# GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public Load write to
+# If you do not have a copy of the GNU General Public License write to
 # the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
 # MA 02139, USA.
 ######################################################################
@@ -42,7 +44,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = "1.1";
+$VERSION = '1.2';
 $Debug = 0;
 
 %_Default_Params = (
@@ -57,7 +59,7 @@ $Debug = 0;
 #### Internal utilities 
 
 sub _subprocesses {
-    my $parent = shift;
+    my $parent = shift || $$;
     # All pids under the given parent
     # Used by testing module
     use Proc::ProcessTable;
@@ -128,7 +130,7 @@ __END__
 
 =head1 NAME
 
-Schedule::Load - Load distribution across multiple host machines
+Schedule::Load - Load distribution and status across multiple host machines
 
 =head1 SYNOPSIS
 

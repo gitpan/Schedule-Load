@@ -1,12 +1,14 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $
+# $Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of either the GNU General Public License or the
+# Perl Artistic License, with the exception that it cannot be placed
+# on a CD-ROM or similar media for commercial distribution without the
+# prior approval of the author.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,6 +18,7 @@
 # If you do not have a copy of the GNU General Public License write to
 # the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
 # MA 02139, USA.
+######################################################################
 
 require 5.005;
 use IO::File;
@@ -52,14 +55,15 @@ complain();
 ######################################################################
 
 sub usage {
-    print '$Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
 }
 
 sub version {
-    print 'Version: $Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $ ';
+    print "Version: $Schedule::Load::VERSION\n";
+    print 'Id: $Id: slpolice,v 1.8 2000/01/21 14:31:04 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

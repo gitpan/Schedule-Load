@@ -1,0 +1,30 @@
+Schedule::Load NEWS --  history of user-visible changes.
+Copyright (C) 2000 Wilson Snyder.
+See the end for copying conditions.
+
+The contributors that suggested a given feature is shown in [].
+	
+This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
+
+* Changes in Schedule::Load 1.2 1/21/2000
+
+****	test.pl improvements: check for free port, use test store directory.
+
+
+* Changes in Schedule::Load 1.1 1/17/2000
+
+**	First CPAN Release
+
+----------------------------------------------------------------------
+$Id: NEWS,v 1.2 2000/01/21 13:58:30 wsnyder Exp $
+----------------------------------------------------------------------
+Copyright information:
+
+Copyright (C) 2000 Wilson Snyder
+
+   See the README file included with this file for licencing information.
+
+Local variables:
+mode: outline
+paragraph-separate: "[ 	]*$"
+end:

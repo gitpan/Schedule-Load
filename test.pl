@@ -1,10 +1,12 @@
-#$Id: test.pl,v 1.9 2000/01/18 00:46:16 wsnyder Exp $
+#$Id: test.pl,v 1.11 2000/01/26 19:50:27 wsnyder Exp $
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
 
 ######################### We start with some black magic to print on failure.
 
 use Sys::Hostname;
+use IO::Socket;
+
 $SIG{INT} = \&cleanup_and_exit;
 #$Debug = 1;
 
@@ -31,18 +33,30 @@ print "ok 1\n";
 %Host_Load = ();  # min loading on each host
 %Hold_Keys = ();  # holding keys in use
 
+$Port = socket_find_free (12123);
 %Invoke_Params = ( dhost => hostname(),
-		   port => 12123,	# Fake port number so can test new version while running old
+		   port => $Port,	# Fake port number so can test new version while running old
 		   );
+
+############
+# Setup
 
 #$Schedule::Load::Debug = $Debug;
 #$Schedule::Load::Hosts::Debug = $Debug;
-############
 
-start_server ("./slchoosed");
-sleep 1;
-start_server ("./slreportd class_verilog=1 reservable=1");
-sleep 4;
+`rm -rf test_store`; #Ok if error
+mkdir ('test_store', 0777);
+
+############
+# Start servers
+
+if (1) {
+    start_server ("./slchoosed");
+    sleep 1;
+    start_server ("./slreportd class_verilog=1 reservable=1 stored_filename=./test_store");
+    check_server_up(8);  # 2*(4 children: perl, sh, daemon master, daemon slave)
+    sleep 5;
+}
 
 ############
 
@@ -116,11 +130,12 @@ undef $scheduler;
 print "\nok 99\n";
 
 print "\nYou would be well advised to look for and kill any\n";
-print "slreportd jobs that are running on --port 12123\n";
+print "slreportd jobs that are running on --port $Port\n";
 print "This program's kill isn't always reliable\n";
 
 ######################################################################
 ######################################################################
+# Test subroutines
 
 sub check_load {
 
@@ -158,7 +173,7 @@ sub testclass {
 	    print $scheduler->print_hosts;
 	}
 
-	my $key = "Perl_Test_$$_$i";
+	my $key = "Perl_Test_".$$."_$i";
 	$best = $scheduler->best(classes => $classlist,
 				 hold_key => $key);
 	if ($best) {
@@ -173,11 +188,57 @@ sub testclass {
 }
 
 ######################################################################
+######################################################################
+# Socket subroutines
+
+sub socket_find_free {
+    my $port = shift;	# Port # to start looking on
+
+    for (; $port<(1<<15); $port++) {
+	print "Looking for free port $port\n" if $Debug;
+	my $fh;
+	$fh = IO::Socket::INET->new( Proto     => "tcp",
+				     PeerAddr  => hostname(),
+				     PeerPort  => $port,
+				     );
+	if ($fh) { # Port exists, try again
+	    $fh->close();
+	    next;
+	}
+	$fh = IO::Socket::INET->new( Proto     => 'tcp',
+				     LocalPort => $port,
+				     Listen    => SOMAXCONN,
+				     Reuse     => 0);
+	if ($fh) {
+	    $fh->close();
+	    return $port;
+	}
+    }
+    die "%Error: Can't find free socket port\n";
+}
+
+######################################################################
+######################################################################
+# Starting subprocesses and cleaning them up
+
+sub check_server_up {
+    my $children = shift;
+    # Are the servers up?  Look for the specific number of children to be running
+    my $try = 60;
+    while ($try--) {
+	my @children = Schedule::Load::_subprocesses();
+	print "@children\n" if $Debug;
+	return if ($#children == $children-1);
+	sleep 1;
+    }
+    die "%Error: Children never started correctly,\nplease try running the daemons in the foreground\n";
+}
 
 {#static
 my %pids;
 END { cleanup_and_exit(); }
 sub cleanup_and_exit {
+    # END routine to kill children
     foreach my $pid (keys %pids) {
 	next if !$pid;
 	foreach (Schedule::Load::_subprocesses($pid)) {
@@ -190,6 +251,7 @@ sub cleanup_and_exit {
 
 sub start_server {
     my $prog = shift;
+    # start given server program in background
 
     $prog = "xterm -e $prog" if $Debug;
 

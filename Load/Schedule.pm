@@ -1,19 +1,21 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.7 2000/01/18 00:15:38 wsnyder Exp $
+# $Id: Schedule.pm,v 1.9 2000/01/21 14:31:09 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public Load
-# as published by the Free Software Foundation; either version 2
-# of the Load, or (at your option) any later version.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of either the GNU General Public License or the
+# Perl Artistic License, with the exception that it cannot be placed
+# on a CD-ROM or similar media for commercial distribution without the
+# prior approval of the author.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public Load for more details.
+# GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public Load write to
+# If you do not have a copy of the GNU General Public License write to
 # the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
 # MA 02139, USA.
 ######################################################################
@@ -37,7 +39,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = $Schedule::Load::VERSION;
+$VERSION = '1.2';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 

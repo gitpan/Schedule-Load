@@ -1,19 +1,21 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.14 2000/01/17 17:49:36 wsnyder Exp $
+# $Id: Hosts.pm,v 1.16 2000/01/21 14:31:09 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public Load
-# as published by the Free Software Foundation; either version 2
-# of the Load, or (at your option) any later version.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of either the GNU General Public License or the
+# Perl Artistic License, with the exception that it cannot be placed
+# on a CD-ROM or similar media for commercial distribution without the
+# prior approval of the author.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public Load for more details.
+# GNU General Public License for more details.
 # 
-# If you do not have a copy of the GNU General Public Load write to
+# If you do not have a copy of the GNU General Public License write to
 # the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
 # MA 02139, USA.
 ######################################################################
@@ -42,7 +44,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = $Schedule::Load::VERSION;
+$VERSION = '1.2';
 
 ######################################################################
 #### Globals
