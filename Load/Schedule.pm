@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.25 2002/08/30 14:59:10 wsnyder Exp $
+# $Id: Schedule.pm,v 1.27 2002/09/24 13:15:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -37,7 +37,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '2.100';
+$VERSION = '2.102';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -202,6 +202,7 @@ sub _scheduler_params {
     my $is_night = (&{$self->{night_hours_cb}} ($self));
     my $schparams = { classes=>   [],
 		      match_cb=>  undef,
+		      rating_cb=>  undef,
 		      allow_none=>0,
 		      favor_host=>$self->{favor_host},
 		      hold_time=> $self->{hold_time},
@@ -384,6 +385,15 @@ Defaults to 20% of the free clump during the day, 100% at night.
 Reference to Function for determining if this is night time, defaults to
 M-F 6am-10pm.  When it is nighttime hours, every class passed to the best
 option has a new class with _night appended.
+
+=item rating_cb
+
+A string containing a subroutine which will be passed a host reference and
+should return a number that is compared against other hosts' ratings to
+determine the best host for a new job.  A return of zero indicates this
+host may not be used.  Ratings closer to zero are better.  Defaults to a
+function that includes the load_limit and the cpu percentage free.
+Evaluated in a Safe container, and can do only minimal core functions.
 
 =back
 

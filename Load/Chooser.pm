@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.36 2002/08/30 14:59:10 wsnyder Exp $
+# $Id: Chooser.pm,v 1.38 2002/09/24 13:15:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.100';
+$VERSION = '2.102';
 
 ######################################################################
 #### Globals
@@ -515,7 +515,7 @@ sub _schedule {
 	if ($host->classes_match ($schparams->{classes})
 	    && $host->eval_match ($schparams->{match_cb})
 	    && !$host->reserved) {
-	    my $rating = $host->rating;
+	    my $rating = $host->rating ($schparams->{rating_cb});
 	    #print "Test host ", $host->hostname," rate $rating\n" if $Debug;
 	    #print Data::Dumper->Dump([$host], ['host']),"\n" if $Debug;
 	    if ($rating > 0) {

@@ -1,5 +1,5 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.8 2002/08/30 14:59:10 wsnyder Exp $
+# $Id: FakeReporter.pm,v 1.10 2002/09/24 13:15:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -34,7 +34,7 @@ use POSIX;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.100';
+$VERSION = '2.102';
 
 ######################################################################
 #### Globals
@@ -98,13 +98,14 @@ sub table {
 	    return;
 	}
 	$pref->{start} ||= time();
+	my $pctcpu = 100*int(($pref->{fixed_load}||1)/ $load_limit);
 	my $proc = Schedule::Load::FakeReporter::ProcessTable::Process->new
 	    (pid=>$pid,
 	     ppid=>0,
-	     pctcpu=>100*int(($pref->{fixed_load}||1)/ $load_limit),
+	     pctcpu=>$pctcpu,
 	     utime=>0, stime=>0,
 	     start=>$pref->{start},
-	     time=>time()-$pref->{start},
+	     time=>(time()-$pref->{start})*1000.0*($pctcpu/100),  # Is in msec
 	     uid=>$pref->{uid}||0,
 	     state=>'run',
 	     priority=>1,
@@ -112,7 +113,7 @@ sub table {
 	     size=>1,
 	     );
 	push @pids, $proc;
-	#print "PIDINH $pid $proc\n";
+	#print "PIDINH $pid $proc   $pref->{start} ",time(),"\n";
     }
     return \@pids;
 }

@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.53 2002/08/30 14:59:10 wsnyder Exp $
+# $Id: Load.pm,v 1.54 2002/09/24 13:15:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -43,7 +43,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '2.100';
+$VERSION = '2.102';
 $Debug = 0;
 
 %_Default_Params = (

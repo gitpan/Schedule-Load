@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.21 2002/08/30 14:59:10 wsnyder Exp $
+# $Id: Host.pm,v 1.23 2002/09/24 13:15:07 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -36,7 +36,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '2.100';
+$VERSION = '2.102';
 
 ######################################################################
 #### Globals
@@ -110,10 +110,16 @@ sub eval_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->eval_match(subroutine)';
     my $subref = shift;
     return 1 if !defined $subref;  # Null reference means match everything
+    return $self->_eval_generic_cb($subref);
+}
+
+sub _eval_generic_cb {
+    my $self = shift;
+    my $subref = shift;
+    # Call &$subref($self) in safe container
     if (ref $subref) {
 	return $subref->($self);
     } else {
-	#print "eval_match: $subref\n" if $Debug;
 	my $compartment = new Safe;
 	$compartment->permit(qw(:base_core));
 	$@ = "";
@@ -145,10 +151,11 @@ sub top_processes {
     return (wantarray ? @keys : \@keys);
 }
 
-sub rating {
+sub rating_cb {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->key(key))';
     # How fast can we process a single job?
-    # 0 is the best rating possible (as 'bad' is open-ended)
+    # 0 indicates can't load this host
+    # closer to 0 are the best ratings (as 'bad' is open-ended)
     if ($self->get_undef('load_limit')
 	&& $self->load_limit <= $self->adj_load) {
 	# Illegal to load this host more
@@ -168,6 +175,13 @@ sub rating {
 
     #printf "%f * (%d+%d+1) / %f / %f = %f\n", ($self->total_pctcpu+1), $self->report_load, $self->adj_load, $self->cpus, $self->max_clock, $rate if $Debug;
     return ($rate>0)?log($rate):0;	# Make a more readable number
+}
+
+sub rating {
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->rating(subroutine)';
+    my $subref = shift;
+    return $self->rating_cb() if !defined $subref;  # Null reference means default callback
+    return $self->_eval_generic_cb($subref);
 }
 
 ######################################################################
