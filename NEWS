@@ -6,6 +6,12 @@ The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
+* Changes in Schedule::Load 3.010 3/10/2004
+
+**	Support detection of hyperthreaded systems.
+
+***	Add physical_cpus host accessor, and show in rschedule hosts report.
+
 * Changes in Schedule::Load 3.003 1/27/2004
 
 ***	Added RSCHLIB make variable so /usr/local/lib/rschedule
@@ -144,7 +150,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.43 2004/01/27 19:03:50 wsnyder Exp $
+$Id: NEWS,v 1.45 2004/03/10 18:04:10 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

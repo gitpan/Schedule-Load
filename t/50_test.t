@@ -1,4 +1,5 @@
-#$Id: test.pl,v 1.26 2004/01/27 19:03:50 wsnyder Exp $
+#!/usr/bin/perl -w
+#$Id: 50_test.t,v 1.1 2004/02/26 21:40:14 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -9,6 +10,7 @@
 
 ######################### We start with some black magic to print on failure.
 
+use lib "./blib/lib";
 use Sys::Hostname;
 use IO::Socket;
 use Cwd;
@@ -19,6 +21,7 @@ use vars qw($Debug $Manual_Server_Start %Host_Load %Hold_Keys
 	    $Port %Invoke_Params);
 
 BEGIN { plan tests => 18 }
+BEGIN { require "t/test_utils.pl"; }
 
 ######################################################################
 
@@ -234,36 +237,6 @@ sub testeval {
     }
     print "\n";
     return $n;
-}
-
-######################################################################
-######################################################################
-# Socket subroutines
-
-sub socket_find_free {
-    my $port = shift;	# Port # to start looking on
-
-    for (; $port<(1<<15); $port++) {
-	print "Looking for free port $port\n" if $Debug;
-	my $fh;
-	$fh = IO::Socket::INET->new( Proto     => "tcp",
-				     PeerAddr  => hostname(),
-				     PeerPort  => $port,
-				     );
-	if ($fh) { # Port exists, try again
-	    $fh->close();
-	    next;
-	}
-	$fh = IO::Socket::INET->new( Proto     => 'tcp',
-				     LocalPort => $port,
-				     Listen    => SOMAXCONN,
-				     Reuse     => 0);
-	if ($fh) {
-	    $fh->close();
-	    return $port;
-	}
-    }
-    die "%Error: Can't find free socket port\n";
 }
 
 ######################################################################

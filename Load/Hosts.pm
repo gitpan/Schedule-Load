@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.63 2004/01/27 19:03:51 wsnyder Exp $
+# $Id: Hosts.pm,v 1.64 2004/03/04 16:33:58 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.003';
+$VERSION = '3.010';
 
 ######################################################################
 #### Globals
@@ -252,7 +252,7 @@ sub print_hosts {
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
-		       $host->cpus, 
+		       $host->cpus_slash, 
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
 		       $host->adj_load,
@@ -633,7 +633,7 @@ Schedule::Load::Hosts - Return host loading information across a network
     foreach my $host ($hosts->hosts) {
 	printf STDOUT ($FORMAT,
 		       $host->hostname, 
-		       $host->cpus, 
+		       $host->cpus_slash, 
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
 		       $host->adj_load, 

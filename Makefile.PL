@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.19 2004/01/27 19:03:50 wsnyder Exp $
+# $Id: Makefile.PL,v 1.23 2004/03/10 18:29:58 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -24,17 +24,15 @@ install::
 	-chmod a+rw \$(RSCHLIB)/rschedule
 
 install-here::
-	make	INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 \
-		INSTALLBIN=/usr/local/bin INSTALLSCRIPT=/usr/local/bin \
-		RSCHLIB=/usr/local/lib \
+	make	RSCHLIB=/imports/nauticus/common/lib \\
 		install
 
 install-test::
-	make	INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 \
-		INSTALLBIN=/usr/local/test/bin 	INSTALLSCRIPT=/usr/local/test/bin \
-		INSTALLSITELIB=/usr/local/test/lib \
-		INSTALLSITEARCH=/usr/local/test/lib/i686-linux \
-		RSCHLIB=/usr/local/test/lib \
+	make	INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 \\
+		INSTALLBIN=/usr/local/test/bin 	INSTALLSCRIPT=/usr/local/test/bin \\
+		INSTALLSITELIB=/usr/local/test/lib \\
+		INSTALLSITEARCH=/usr/local/test/lib/i686-linux \\
+		RSCHLIB=/usr/local/test/lib \\
 		install
 
 README: readme.texi
@@ -42,10 +40,16 @@ README: readme.texi
 	makeinfo \$< --output \$@ --no-headers --no-validate
 
 ## Maintainer use:
+preexist:
+	test ! -r \$(HOME)/src/kits/\$(DISTVNAME).tar.gz
+
 tag:
 	cvs tag -F \$(DISTNAME)_\$(VERSION_SYM) .
 
-maintainer-dist: dist tag
+maintainer-diff:
+	cvs diff -r \$(DISTNAME)_\$(VERSION_SYM) 
+
+maintainer-dist: preexist dist tag
 	cp \$(DISTVNAME).tar.gz \$(HOME)/src/kits
 	mv \$(DISTVNAME).tar.gz \$(HOME)/backpack
 
@@ -64,7 +68,7 @@ WriteMakefile(
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
 	      PREREQ_PM => {'Proc::ProcessTable' => 0,
-			    'Unix::Processors' => 1.7,
+			    'Unix::Processors' => 2.020,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,
 			    'IPC::PidStat' => 1.410,

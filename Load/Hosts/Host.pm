@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.32 2004/01/27 19:03:51 wsnyder Exp $
+# $Id: Host.pm,v 1.33 2004/03/04 16:33:58 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.003';
+$VERSION = '3.010';
 
 ######################################################################
 #### Globals
@@ -151,6 +151,15 @@ sub _eval_generic_cb {
 
 ######################################################################
 #### Special accessors
+
+sub cpus_slash {
+    my $self = shift;
+    if ($self->cpus != $self->physical_cpus) {
+	return $self->physical_cpus."/".$self->cpus;
+    } else {
+	return $self->cpus;
+    }
+}
 
 sub top_processes {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->key(key))';
@@ -318,7 +327,14 @@ Architecture name from Perl build.
 
 =item cpus
 
-Number of CPUs.
+Number of CPUs.  On hyperthreaded Linux systems, this indicates the maximum
+number of simultaneous threads that may execute; see physical_cpus for the
+real physical CPU count.
+
+=item cpus_slash
+
+Returns a string with the number of cpus, or in hyperthreaded systems, the
+number of physical cpus "/" the number of SMT cpus.
 
 =item holds
 
@@ -340,6 +356,10 @@ of CPUs to not allow overloading of a machine.  Undefined if no limit.
 =item osname
 
 Operating system name from Perl build.
+
+=item physical_cpus
+
+Number of CPUs physically present.
 
 =item reservable
 

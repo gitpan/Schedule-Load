@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.48 2004/01/27 19:03:51 wsnyder Exp $
+# $Id: Reporter.pm,v 1.49 2004/03/04 16:33:58 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.003';
+$VERSION = '3.010';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -259,8 +259,9 @@ sub _fill_const {
     $self->{const_changed} = 1;
  
     # Load our required keys
-    $self->{const}{cpus}      ||= Unix::Processors->max_online();
-    $self->{const}{max_clock} ||= Unix::Processors->max_clock();
+    $self->{const}{cpus}          ||= Unix::Processors->max_online();
+    $self->{const}{physical_cpus} ||= Unix::Processors->max_physical();
+    $self->{const}{max_clock}     ||= Unix::Processors->max_clock();
     $self->{const}{osname}    ||= $Config{osname};
     $self->{const}{osvers}    ||= $Config{osvers};
     $self->{const}{archname}  ||= $Config{archname};
@@ -424,6 +425,7 @@ sub _fill_dynamic {
 	# Load any processes with lots of time, or with fixed_loading
 	# that isn't otherwise accounted for
 	my $pctcpu = $pidinfo{$p->pid}{pctcpu};
+	$pctcpu = 0 if $pctcpu eq 'nan';
 	if ($logit) {
 	    _fill_dynamic_pid ($self, $p, $pctcpu);
 	    $self->{dynamic}{proc}{$p->pid}{cmndcomment} = $cmndcomment if $cmndcomment;
