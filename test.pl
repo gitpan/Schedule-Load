@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.23 2002/08/14 19:14:10 wsnyder Exp $
+#$Id: test.pl,v 1.24 2003/04/24 13:14:09 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -14,7 +14,7 @@ use strict;
 use vars qw($Debug $Manual_Server_Start %Host_Load %Hold_Keys
 	    $Port %Invoke_Params);
 
-BEGIN { plan tests => 17 }
+BEGIN { plan tests => 18 }
 
 ######################################################################
 
@@ -72,8 +72,11 @@ if (!$Manual_Server_Start) {
     start_server ("./slreportd class_verilog=1 reservable=1 --nofork"
 		  # Stored filename must be absolute as deamon chdir's
 		  ." --stored_filename=".getcwd()."/test_store/".hostname());
-    check_server_up(6 + ($Debug?2:0));  # (6 children: perl, sh, choose sh, choose, report sh, report)
+    start_server ("./slreportd --fake hostname=fakehost class_verilog=1 reservable=1 --nofork"
+		  # Stored filename must be absolute as deamon chdir's
+		  ." --stored_filename=".getcwd()."/test_store/".hostname());
     sleep 5;
+    check_server_up(3*(3+($Debug?1:0)));  # (children: perl, sh, #deamons*(sh, deam, checker))
 }
 
 ############
@@ -103,11 +106,11 @@ ok ($cpus>0);
 
 # Check evals
 print "eval_match check\n";
-ok (testeval(sub{return 1;})==1);
-ok (testeval('sub{return $_[0]->get_undef("class_verilog");}')==1);
+ok (testeval(sub{return 1;})==2);
+ok (testeval('sub{return $_[0]->get_undef("class_verilog");}')==2);
 
 # Choose host, get this one
-testclass (['verilog'], undef);
+testclass (['class_verilog'], undef);
 ok(1);
 
 testclass (undef, "sub {return 1;}");
@@ -190,7 +193,7 @@ sub testclass {
 
     print "="x70, "\n";
     print "Machines of class ", join(' ',@{$classlist}), ":\n" if $classlist;
-    foreach my $host ($scheduler->hosts_of_class(classes => $classlist)) {
+    foreach my $host ($scheduler->hosts_match(classes => $classlist)) {
 	printf "  %s", $host->hostname;
     }
     print "\n\n";

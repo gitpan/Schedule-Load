@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.42 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Chooser.pm,v 1.51 2003/05/07 23:58:16 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -30,15 +30,19 @@ use IO::Select;
 use Tie::RefHash;
 use Net::hostent;
 use Sys::Hostname;
+BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
 
 use Schedule::Load qw (:_utils);
 use Schedule::Load::Schedule;
 use Schedule::Load::Hosts;
+use IPC::PidStat;
 
 use strict;
 use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Select
+	    $Exister
 	    $Time $TimeStr
-	    $Server_Self %Holds);
+	    $Server_Self %ChooInfo);
+use vars qw(%Holds);  # $Holds{hold_key}[listofholds] = HOLD {hostname=>, scheduled=>1,}
 use Carp;
 
 ######################################################################
@@ -47,7 +51,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.104';
+$VERSION = '3.001';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -60,6 +64,11 @@ tie %Clients, 'Tie::RefHash';
 
 $Time = time();	# Cache the time
 $TimeStr = _timelog();
+%ChooInfo = (# Information to pass to "rschedule info"
+	     slchoosed_hostname => hostname(),
+	     slchoosed_connect_time => time(),
+	     slchoosed_status => "Connected",
+	     );
 
 ######################################################################
 #### Creator
@@ -89,6 +98,9 @@ sub start {
     $Select = IO::Select->new($server);
     $Hosts = Schedule::Load::Schedule->new(_fetched=>-1,);  #Mark as always fetched
 
+    $Exister = new IPC::PidStat();
+    $Select->add($Exister->fh);
+
     $self->_probe_reset();
 
     while (1) {
@@ -110,13 +122,16 @@ sub start {
 			  };
 		$Clients{$clientfh} = $client;
 	    }
+	    elsif ($fh == $Exister->fh) {
+		_exist_traffic();
+	    }
 	    else {
 		# Input traffic on other client
 		_client_service($Clients{$fh});
 	    }
 	}
 	# Action or timer expired, only do this if time passed
-	if ($Time != time()) {
+	if (time() != $Time) {
 	    $Time = time();	# Cache the time
 	    $TimeStr = _timelog() if $Debug;
 	    _hold_timecheck();
@@ -182,7 +197,7 @@ sub _probe_reset {
 
 sub _client_close {
     # Close this client
-    my $client = shift || die;
+    my $client = shift || return;
 
     my $fh = $client->{socket};
     print "$TimeStr Closing client $fh\n" if $Debug;
@@ -213,13 +228,13 @@ sub _client_close_all {
 
 sub _client_done {
     # Done with this client
-    my $client = shift || die;
+    my $client = shift || return;
     _client_send($client, "DONE\n");
 }
 
 sub _client_service {
     # Loop getting commands from a specific client
-    my $client = shift || die;
+    my $client = shift || return;
     
     my $fh = $client->{socket};
     my $data = '';
@@ -254,7 +269,9 @@ sub _client_service {
 	    _user_done_finish ($client->{host});
 	}
 	# User commands
-	elsif ($cmd eq "get_const_load_proc") {
+	elsif ($cmd eq "get_const_load_proc"
+	       || $cmd eq "get_const_load_proc_chooinfo"
+	       ) {
 	    _user_get ($client, "report_get_dynamic\n", $cmd);
 	} elsif ($cmd eq "schedule") {
 	    _user_schedule ($client, $params);
@@ -262,7 +279,7 @@ sub _client_service {
 	    _user_to_reporter ($client, [$params->{host}], $line."\n");
 	    _client_done ($client);
 	} elsif ($cmd eq "hold_release") {
-	    _hold_done ($params->{hold_key});
+	    _hold_delete ($Holds{$params->{hold_key}});
 	    _client_done ($client);
 	}
 	# User reset
@@ -282,7 +299,7 @@ sub _client_service {
 }
 
 sub _client_send {
-    my $client = shift || die;
+    my $client = shift || return;
     my $out = join "", @_;
     # Send any arguments to the client
     # Returns 0 if failed, else 1
@@ -316,7 +333,7 @@ sub _client_ping_timecheck {
 #### Services for slreportd calls
 
 sub _host_start {
-    my $client = shift || die;
+    my $client = shift || return;
     my $params = shift;
     # const command: establish a new host, load constants
     my $hostname = $params->{hostname};
@@ -363,16 +380,11 @@ sub _host_start {
 }
 
 sub _host_dynamic {
-    my $client = shift || die;
+    my $client = shift || return;
     my $field = shift;
     my $params = shift;
     # load/proc command: 
-
     $client->{host}{$field} = $params;
-
-    if ($field eq "dynamic") {
-	_hold_adjust ($client->{host});
-    }
 }
 
 ######################################################################
@@ -436,9 +448,12 @@ sub _user_send {
     my $types = shift;
     # Send requested types of information back to the user
     print "$TimeStr _user_send $client $types\n" if $Debug;
+    _holds_adjust();
     _user_send_type ($client, "const") if ($types =~ /const/);
     _user_send_type ($client, "stored") if ($types =~ /load/);
     _user_send_type ($client, "dynamic") if ($types =~ /load/ || $types =~ /proc/);
+    _make_chooinfo();
+    _client_send    ($client, _pfreeze ("chooinfo", \%ChooInfo, 0)) if ($types =~ /chooinfo/);
 }
 
 sub _user_send_type {
@@ -509,7 +524,7 @@ sub _user_schedule_sendback {
     # Schedule and return results to the user
 
     my $schresult = _schedule ($schparams);
-    _client_send ($userclient, _pfreeze ("best", $schresult, $Debug));
+    _client_send ($userclient, _pfreeze ("schrtn", $schresult, $Debug));
     _client_done ($userclient);
 }    
 
@@ -525,68 +540,130 @@ sub _user_schedule {
     _user_done_check($userclient);
 }
 
-sub _schedule {
-    # Choose the best host and total resources available for scheduling
-    my $schparams = shift;  #favor_host, classes, _is_night
+sub _schedule_one_resource {
+    my $schparams = shift;
+    my $resreq = shift;		# ResourceReq reference
     
-    my $freejobs = 0;
+    #Factors:
+    #  hosts_match:  reserved, match_cb, classes
+    #	   -> Things that absolutely must be correct to schedule here
+    #  rating:	     load_limit, cpus, clock, adj_load, tot_pctcpu, rating_adder
+    #	   -> How to prioritize, if 0 it's overbooked
+    #  loads_avail:  holds, fixed_load
+    #	   -> How many more jobs host can take before we should turn off new jobs
+
+    # Note we need to subtract resources which aren't scheduled yet, but have higher
+    # priorities then this request.  This allows for a pool request of 10 machines
+    # to eventually start without being starved by little 1 machine requests that keep
+    # getting issued.
+
     my $bestref = undef;
-    my $bestload = undef;
+    my $bestrating = undef;
     my $favorref = undef;
-    my $favorhost = $Hosts->get_host($schparams->{favor_host}) || 0;
-    my $freecpu = 0;
-    foreach my $host (@{$Hosts->hosts}) {
-	#print "What about ", $host->hostname, "\n" if $Debug;
-	if ($host->classes_match ($schparams->{classes})
-	    && $host->eval_match ($schparams->{match_cb})
-	    && !$host->reserved) {
-	    my $rating = $host->rating ($schparams->{rating_cb});
-	    #print "Test host ", $host->hostname," rate $rating\n" if $Debug;
-	    #print Data::Dumper->Dump([$host], ['host']),"\n" if $Debug;
-	    if ($rating > 0) {
-		my $machjobs = ($host->cpus - $host->adj_load);
-		$machjobs = 0 if ($machjobs < 0);
-		$machjobs = int ($machjobs + .7);
-		$freejobs += $machjobs;
-		if ($host == $favorhost && $machjobs) {
+    my $favorhost = $Hosts->get_host($resreq->{favor_host}) || 0;
+    my $freecpus = 0;
+    my $totcpus = 0;
+    # hosts_match takes: classes, match_cb, allow_reserved
+    foreach my $host ($Hosts->hosts_match(%{$resreq})) {
+	$totcpus += $host->cpus;
+	my $rating = $host->rating ($resreq->{rating_cb});
+	print "\tTest host ", $host->hostname," rate $rating, free ",$host->free_cpus,"\n" if $Debug;
+	#print Data::Dumper->Dump([$host], ['host']),"\n" if $Debug;
+	if ($rating > 0) {
+	    my $machfreecpus = $host->free_cpus;
+	    $freecpus += $machfreecpus;
+	    if (!$schparams->{allow_none} || $machfreecpus) {
+		# Else, w/allow_none even if this host has cpu time
+		# left and a better rating, it might not have free job slots
+		if ($host == $favorhost && $machfreecpus) {
 		    # Found the favored host has resources, force it to win
 		    $favorref = $host;
 		    $bestref = undef; # For next if statement to catch
 		}
 		if (!defined $bestref
-		    || (($rating < $bestload) && !$favorref)) {
+		    || (($rating < $bestrating) && !$favorref)) {
 		    $bestref = $host;
-		    $bestload = $rating;
-		    $freecpu = 1 if $machjobs > 0;
+		    $bestrating = $rating;
 		}
 	    }
 	}
     }
 
-    my $jobs = $freejobs;
-    if ($schparams->{max_jobs}<=0) {  # Fraction that's percent of clump if negative
-	$jobs = int($freejobs * (-$schparams->{max_jobs}));
+    my $jobs = $freecpus;
+    if ($resreq->{max_jobs}<=0) {  # Fraction that's percent of clump if negative
+	$jobs = _min($jobs, int($totcpus * (-$resreq->{max_jobs})) - ($resreq->{jobs_running}||0));
     } else {
-	$jobs = _min($jobs, $schparams->{max_jobs});
+	$jobs = _min($jobs, $resreq->{max_jobs} - ($resreq->{jobs_running}||0));
     }
-    $jobs = _min($jobs, $freejobs);
-    if ($schparams->{allow_none} && (!$freecpu || $jobs<1)) {
+    if ($schparams->{allow_none} && ($jobs<1)) {
 	$bestref = undef;
     }
     $jobs = _max($jobs, 1);
+    
+    return ($bestref,$jobs);
+}
 
-    if ($bestref && $schparams->{hold_key}) {
-	$Holds{$schparams->{hold_key}} = {
-	    hostname=>$bestref->hostname,
-	    expires=>($Time + $schparams->{hold_time}),
-	    hold_load=>($schparams->{hold_load}||1),
-	};
-	_hold_adjust ($bestref);
+sub _schedule {
+    # Choose the best host and total resources available for scheduling
+    my $schparams = shift;  #allow_none=>$, hold=>ref, requests=>[ref,ref...]
+    
+    # Clear holds for this request, the user may have scheduled (and failed) earlier.
+    my $schhold = $schparams->{hold};
+    if (my $oldhold = $Holds{$schhold->hold_key}) {
+	# Keep a old req_time, as a new identical request doesn't deserve to move to the end of the queue
+	# This also prevents livelock problems where a scheduled hold was issued to the oldest request,
+	# then that request returns and is no longer the oldest.
+	$schhold->{req_time} = _min($schhold->{req_time}, $oldhold->{req_time});
+	_hold_delete($oldhold);
+    }
+    _holds_clear_unallocated();
+    _holds_adjust();
+    
+    print "$TimeStr _schedule $schhold->{hold_key}\n" if $Debug;
+    _hold_add_schreq($schparams);
+    $schparams->{hold} = undef;  # Now have schparams under hold, don't need circular reference
+
+    # Loop through all requests and issue hold keys to those we can
+    my $resdone = 1;
+    my @reshostnames = ();
+    my $resjobs;
+    foreach my $hold (sort {$a->compare_pri_time($b)} (values %Holds)) {
+	my $schreq = $hold->{schreq};
+	next if !$schreq;
+	# Careful, we generally want $schreq rather then $schparams in this loop...
+	print "  SCHREQ for $hold->{hold_key}\n" if $Debug;
+	foreach my $resref (@{$schreq->{resources}}) {
+	    print "    Ressch for $hold->{hold_key}\n" if $Debug;
+	    my ($bestref,$jobs) = _schedule_one_resource($schreq,$resref);
+	    if ($bestref) {
+		print "      Resdn $jobs on ",$bestref->hostname," for $hold->{hold_key}\n" if $Debug;
+		# Hold this resource so next schedule loop doesn't hit it
+		_hold_add_host($hold, $bestref);
+	    }
+	    if ($hold == $schhold) {   # We're scheduling the one the user asked for
+		$resjobs = $jobs;
+		if ($bestref) {
+		    push @reshostnames, $bestref->hostname;
+		} else {  # None found, we didn't schedule anybody...
+		    $resdone = 0;
+		}
+	    }
+	}
     }
 
-    return {jobs => $jobs,
-	    best => $bestref ? $bestref->hostname : undef,
-	    hold_key => $schparams->{hold_key},
+    # If we scheduled ok, move the hold to a assigment, so next schedule doesn't kill it
+    if ($resdone) {
+	$schhold->{allocated} = 1;   # _holds_clear_unallocated checks this
+	$schhold->{schreq} = undef;  # So we don't schedule it again
+	# We don't need to do another hold_new, since we've changed the reference each host points to.
+    }
+
+    print "DONE_HOLDS:  ",Data::Dumper::Dumper (\%Holds) if $Debug;
+
+    # Return the list of hosts we scheduled
+    return {jobs => $resjobs,
+	    best => ($resdone ? \@reshostnames : undef),
+	    hold => ($resdone ? $schhold : undef),
 	};
 }
 
@@ -594,43 +671,119 @@ sub _schedule {
 ######################################################################
 #### Holds
 
-sub _hold_timecheck {
-    # See if any holds have expired; if so delete them
-    foreach my $key (keys %Holds) {
-	if ($Time > $Holds{$key}{expires}) {
-	    #print "HOST DONE MARK $host $hostname $key EXP $Holds{$hostname}{$key}{expires}\n" if $Debug;
-	    _hold_done ($key);
-	}
-    }
+sub _hold_add_schreq {
+    my $schreq = shift;
+    # Add this request to the ordered list of requests
+    $Holds{$schreq->{hold}->hold_key} = $schreq->{hold};
+    my $hold = $Holds{$schreq->{hold}->hold_key};
+    $hold->{schreq} = $schreq;
+    $hold->{schreq}{hold} = undef;  # Now have schreq under hold, don't need circular reference
 }
 
-sub _hold_done {
-    my $key = shift;
-    # Remove a load hold on this machine
-
-    print "$TimeStr _hold_done($key)\n" if $Debug;
-    return if !defined $Holds{$key};
-    my $host = $Hosts->get_host($Holds{$key}{hostname});
-    delete $Holds{$key};
-    warn "No host $host" if !$host && $Debug;
-    _hold_adjust ($host, 1) if $host;
-}
-
-sub _hold_adjust {
+sub _hold_add_host {
+    my $hold = shift;
     my $host = shift;
-    my $skip_timecheck = shift;
-    # Adjust loading on specified machine to make up for actual load
+    # Hostnames must be a list, not a hash as we can have multiple holds
+    # w/same request applying to the same host.
+    $hold->{hostnames} ||= [];
+    push @{$hold->{hostnames}}, $host->hostname;
+    # Not: _holds_adjust, save unnecessary looping and just add the load directly.
+    $host->{dynamic}{adj_load} += $hold->{hold_load};
+}
 
-    _hold_timecheck() if !$skip_timecheck;
-    #print Data::Dumper::Dumper (\%Holds) if $Debug;
-    my $hostname = $host->hostname;
-    my $adj = $host->{dynamic}{report_load};
-    foreach my $holdkey (keys %Holds) {
-	if ($Holds{$holdkey}{hostname} eq $hostname) {
-	    $adj += $Holds{$holdkey}{hold_load};
+sub _hold_delete {
+    my $hold = shift;
+    # Remove a load hold under speced key
+    return if !defined $hold;
+    print "$TimeStr _hold_delete($hold->{hold_key})\n" if $Debug;
+    delete $Holds{$hold->{hold_key}}{schreq};  # So don't loose memory from circular reference
+    delete $Holds{$hold->{hold_key}};
+}
+
+sub _holds_clear_unallocated {
+    # We're going to start a schedule run, delete any holds not on resources
+    # that have been truely allocated
+    foreach my $hold (values %Holds) {
+	if (!$hold->{allocated}) {
+	    $hold->{hostnames} = [];	# Although we delete, there may still be other references to it...
 	}
     }
-    $host->{dynamic}{adj_load} = $adj;
+}
+
+sub _hold_timecheck {
+    # Called once every 3 seconds.
+    # See if any holds have expired; if so delete them
+    #print "hold_timecheck $Time\n" if $Debug;
+    foreach my $hold (values %Holds) {
+	$hold->{expires} ||= ($Time + ($hold->{hold_time}||10));
+	if ($Time > $hold->{expires}) {
+	    #print "HOST DONE MARK $host $hostname $key EXP $hold->{expires}\n" if $Debug;
+	    # Same cleanup below in _exist_traffic
+	    _hold_delete ($hold);
+	} else {
+	    $Exister->pid_request(host=>$hold->{req_hostname}, pid=>$hold->{req_pid});
+	}
+    }
+}
+
+sub _holds_adjust {
+    # Adjust loading on all machines to make up for scheduler holds
+    print "HOLDS:  ",Data::Dumper::Dumper (\%Holds) if $Debug;
+
+    # Reset adjusted loads
+    foreach my $host ($Hosts->hosts) {
+	$host->{dynamic}{adj_load} = $host->{dynamic}{report_load};
+	$host->{dynamic}{holds} = [];
+    }
+
+    # adj_load is the report_load plus any hold_keys allocated on a specific host
+    #          plus any hold_keys waiting to finish their scheduling run
+    foreach my $hold (values %Holds) {
+	foreach my $hostname (@{$hold->{hostnames}}) {
+	    my $host = $Hosts->get_host($hostname);
+	    if (!$host) {
+		# This can happen when we do a hold on a host and that host's reporter
+		# then goes down.  It's harmless, as all will be better when it comes back.
+		warn "No host $hostname" if $Debug;
+	    } else {
+		$host->{dynamic}{adj_load} += $hold->{hold_load};
+		push @{$host->{dynamic}{holds}}, $hold;
+	    }
+	}
+    }
+}
+
+######################################################################
+
+sub _exist_traffic {
+    # Handle UDP responses from our $Exister->pid_request calls.
+    #print "UDP PidStat in...\n" if $Debug;
+    my ($pid,$exists,$onhost) = $Exister->recv_stat();
+    return if !defined $pid;
+    return if $exists;   # We only care about known-missing processes
+    print "$TimeStr   UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n" if $Debug;
+    # We don't maintain a table sorted by pid, as these messages
+    # are rare, and there can be many holds per pid.
+    foreach my $hold (values %Holds) {
+	if ($hold->{req_pid}==$pid && $hold->{req_hostname} eq $onhost) {
+	    # Same cleanup above when timer expires
+	    _hold_delete ($hold);
+	}
+    }
+}
+
+######################################################################
+######################################################################
+#### Information to pass up to "rschedule status" for debugging
+
+sub _make_chooinfo {
+    # Load information we want to pass up to rschedule for debugging chooser
+    # details from a client application
+    $ChooInfo{schreqs} = {};
+    foreach my $hold (values %Holds) {
+	next if !$hold->{schreq};
+	$ChooInfo{schreqs}{$hold->hold_key} = $hold;
+    }
 }
 
 ######################################################################
@@ -681,6 +834,9 @@ The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 /etc/services, else 1752.
 
 =item dead_time
+
+Seconds after which if a client doesn't respond to a ping, it is considered
+dead.
 
 =head1 SEE ALSO
 

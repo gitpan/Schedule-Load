@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.30 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Schedule.pm,v 1.33 2003/05/08 20:17:15 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -25,6 +25,7 @@ require Exporter;
 
 use Schedule::Load qw (:_utils);
 use Schedule::Load::Hosts;
+use Schedule::Load::ResourceReq;
 use Sys::Hostname;
 use Time::localtime;
 
@@ -37,7 +38,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '2.104';
+$VERSION = '3.001';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -51,10 +52,7 @@ sub new {
     @_ >= 1 or croak 'usage: '.__PACKAGE__.'->new ({options})';
     my $proto = shift;
     return $proto->SUPER::new
-	( night_hours_cb => \&night_hours_p,
-	  favor_host => hostname(),
-	  hold_load => 1,
-	  hold_time => 60,	# secs
+	( scheduled_hosts => [],
 	  @_);
 }
 
@@ -64,15 +62,23 @@ sub new {
 ######################################################################
 #### Accessors
 
+sub scheduled_hosts {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->scheduled_hosts (perhaps you forgot to check schedule return for undef)';
+    return (wantarray ? @{$self->{scheduled_hosts}} : $self->{scheduled_hosts});
+}
+
+sub scheduled_hostnames {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->scheduled_hosts (perhaps you forgot to check schedule return for undef)';
+    return () if !$self->{scheduled_hosts}[0];
+    my @names = map {$_->hostname; } $self->scheduled_hosts;
+    return @names;
+}
+
 sub hosts_of_class {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
-    my $schparams = $self->_scheduler_params (@_);
-    # Return all hosts matching given class
-    my @keys = ();
-    foreach (@{$self->hosts}) {
-	push @keys, $_ if $_->classes_match ($schparams->{classes});
-    }
-    return (wantarray ? @keys : \@keys);
+    # DEPRECIATED.  Return all hosts matching given class
+    # allow_reserved was ignored in the old implementation...
+    return $self->hosts_match (@_, allow_reserved=>1);
 }
 
 ######################################################################
@@ -142,8 +148,9 @@ sub fixed_load {
 	load=>1,
 	uid=>$<,
 	pid=>$$,
+	req_hostname=>hostname(),  # Where to do a pid_exists
 	@_,};
-
+    $params->{req_pid} ||= $params->{pid};
     print __PACKAGE__."::fixed_load($params->{load})\n" if $Debug;
     $self->_request(_pfreeze( 'report_fwd_fixed_load', $params, $Debug));
 }
@@ -163,30 +170,76 @@ sub hold_release {
 #### Scheduling
 
 sub best {
-    my $self = shift; ($self && ref($self)) or croak 'usage: $self->best)';
-    my $schparams = $self->_scheduler_params (@_);
-
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->best';
+    my %params = (allow_none=>0,
+		  @_);
     print __PACKAGE__."::best()\n" if $Debug;
-    $self->_schedule_and_get ($schparams);
-    return ($self->{_best}{best});
+    # Backward compatible best function, scheduling on one host without
+    # need to understand new Hold and ResourceReq structures.
+
+    # Make a hold element with passed params
+    my $hold = Schedule::Load::Hold->new(hold_key=>"best",);
+    $hold->set_fields (%{$self},%params);
+    # Make resource requests with passed params
+    my $req = Schedule::Load::ResourceReq->new();
+    $req->set_fields (%{$self},%params);
+    my $rtn = $self->schedule
+	(resources=>[$req],
+	 hold=>$hold,
+	 allow_none=>1,
+	 %params);
+    return undef if !$rtn;
+    return undef if !$rtn || !$rtn->scheduled_hosts;
+    my @hn = $rtn->scheduled_hostnames;
+    return $hn[0];
 }
 
 sub jobs {
-    my $self = shift; ($self && ref($self)) or croak 'usage: $self->jobs)';
-    my $schparams = $self->_scheduler_params (@_);
-
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->jobs';
+    #** Old depreciated interface
     print __PACKAGE__."::jobs()\n" if $Debug;
-    $self->_schedule_and_get ($schparams);
-    return ($self->{_best}{jobs});
+    my @names = $self->idle_host_names(@_);
+    return ($#names+1);
 }
 
-sub _schedule_and_get {
+sub schedule {
     my $self = shift;
-    my $schparams = shift;
+    my %params = (allow_none=>0,
+		  hold=>undef,	# Schedule::Load::Hold reference, undef not to hold
+		  resources=>[],# Schedule::Load::ResourceReq reference
+		  @_);
 
-    $self->{_best} = {};
-    $self->_request(_pfreeze ("schedule", $schparams, 0&&$Debug));
-    (defined $self->{_best}{jobs}) or die "%Error: Didn't get proper schedule response\n";
+    $self->{scheduled_hosts} = [];
+    $self->{_schrtn} = undef;
+    $params{resources}[0] or croak "%Error: Not passed any resources=>[] to schedule,";
+
+    use Data::Dumper; print "SCHEDULE: ",Dumper(\%params) if $Debug;
+    $self->_request(_pfreeze ("schedule", \%params, 0&&$Debug));
+
+    use Data::Dumper; print "RETURN: ",Dumper($self->{_schrtn}) if $Debug;
+    (defined $self->{_schrtn}) or die "%Error: Didn't get proper schedule response\n";
+
+    if (!$self->{_schrtn}{best}) {
+	return undef;
+    } else {
+	# Remap the hostnames to references (can't pass refs across a socket!)
+	foreach my $hostname (@{$self->{_schrtn}{best}}) {
+	    my $host = $self->get_host($hostname);
+	    if (!$host) {
+		# It's a host that wasn't in our cache....
+		print " Gethost $hostname failed, retrying caching\n" if $Debug;
+		$self->kill_cache;
+		$self->fetch;
+		$host = $self->get_host($hostname);
+		if (!$host) {
+		    print " Gethost $hostname retry failed\n" if $Debug;
+		    return undef;  # Next scheduler attempt should make sense of it all...
+		}
+	    }
+	    push @{$self->{scheduled_hosts}}, $host;
+	}
+    }
+    return $self;
 }
 
 sub night_hours_p {
@@ -195,36 +248,6 @@ sub night_hours_p {
 		   && (localtime->wday >= 1 && localtime->wday < 6));
     return !$working;
 }
-
-sub _scheduler_params {
-    my $self = shift;
-
-    my $is_night = (&{$self->{night_hours_cb}} ($self));
-    my $schparams = { classes=>   [],
-		      match_cb=>  undef,
-		      rating_cb=>  undef,
-		      allow_none=>0,
-		      favor_host=>$self->{favor_host},
-		      hold_time=> $self->{hold_time},
-		      hold_key=>  undef,
-		      hold_load=> 1,
-		      max_jobs=>  ($is_night ? -1  : -0.5 ),
-		      @_ };
-    # Take a ref to list of classes and add class_ and any night time options
-    # Return ref to hash with scheduler options: classes and is_night
-
-    my @classes = ();
-    foreach (@{$schparams->{classes}}) {
-	$_ = "class_$_" if $_ !~ /^class_/;
-	push @classes, $_;
-	push @classes, $_ . "_night" if $is_night && ($_ !~ /_night$/);
-    }
-    $schparams->{classes} = \@classes;
-    print "schparams=", Data::Dumper::Dumper ($schparams) if $Debug;
-    return $schparams;
-}
-
-#    $self->_request("get const load proc\n");
 
 ######################################################################
 ######################################################################
@@ -289,14 +312,19 @@ work for that module also work here.
 
 =item best (...)
 
-Returns the hostname of the best host in the network for a new job.
+Returns the hostname of the best host in the network for a single new job.
+Parameters may be parameters specified in this class, Schedule::Load::Hold,
+or Schedule::Load::ResourceReq.  Those packages must be used individually
+if multiple resources need to be scheduled simultanously.
 
-=item fixed_load (load=>load_value, [pid=>$$], [host=>localhost])
+=item fixed_load (load=>load_value, [pid=>$$], [host=>localhost], [req_pid=>$$, req_hostname=>localhost])
 
 Sets the current process and all children as always having at least the
 load value specified.  This prevents undercounting CPU utilization when a
 large batch job is running which is just paused in the short term to do
-disk IO or sleep.
+disk IO or sleep.  Requests to fake reporters (resources not associated
+with a CPU) may specify req_pid and req_hostname which are the PID and
+hostname that must continue to exist for the fixed_load to remain in place.
 
 =item hold_release (hold_key=>key)
 
@@ -304,8 +332,7 @@ Releases the temporary hold placed with the best function.
 
 =item hosts_of_class (class=>name)
 
-Returns C<Schedule::Load::Hosts::Host> objects for every host that matches
-the given class.
+Depreciated, and to be removed in later releases.  Use hosts_match instead.
 
 =item jobs (...)
 
@@ -324,6 +351,18 @@ release does not have to be the same user that reserved the host.
 Reserves the machine for exclusive use of the current user.  The host
 choosen must have the reservable flag set.  C<rschedule hosts> will show
 the host as reserved, along with the provided comment.
+
+=item schedule (hold=>Schedule::Load::Hold ref, resources=>[], [allow_none=>1])
+
+Schedules the passed list of Schedule::Load::ResourceReq resources, and
+holds them using the passed hold key.  If allow_none is set and the loading
+is too high, does not schedule any resources.  Returns a object reference
+to use with scheduled_hosts, or undef if no resources available.
+
+=item scheduled_hosts
+
+Returns a list of Schedule::Load::Host objects that were scheduled using
+the last schedule() call.
 
 =item set_stored (host=>hostname, [set_const=>1], [key=>value])
 
@@ -348,60 +387,6 @@ network, then no cpu will be choosen.  This is useful for programs that can
 dynamically adjust their outstanding job count.  (Presumably you would only
 set allow_none if you already have one job running, or you can get
 livelocked out of getting anything!)
-
-=item classes
-
-An array reference of which classes the host must support to allow this job
-to be run on that host.  Defaults to [], which allows any host.
-
-=item favor_host
-
-The hostname to try and choose if all is equal, under the presumption that
-there are disk access time benefits to doing so.  Defaults to the current host.
-
-=item hold_key
-
-A hold key will reserve a job slot on the choosen CPU until a release_hold
-function is called.  This prevents overscheduling a host due to the delay
-between choosing a host with a light load and starting the job on it which
-rases the CPU load of that choosen host.
-
-=item hold_time
-
-Number of seconds to allow the hold to remain before being removed
-automatically.
-
-=item hold_load
-
-Number of cpu loads the hold_key should reserve, defaults to one.
-
-=item match_cb
-
-A string containing a subroutine which will be passed a host reference and
-should return true if this host has the necessary properties.  This will be
-evaluated in a Safe container, and can do only minimal core functions.  For
-example: match_cb=>"sub{return $_[0]->get_undef('memory')>512;}"
-
-=item max_jobs
-
-Maximum number of jobs that jobs() can return.  Negative fraction indicates
-that percentage of the clump, for example -0.5 will use 50% of free CPUs.
-Defaults to 20% of the free clump during the day, 100% at night.
-
-=item night_hours_cb
-
-Reference to Function for determining if this is night time, defaults to
-M-F 6am-10pm.  When it is nighttime hours, every class passed to the best
-option has a new class with _night appended.
-
-=item rating_cb
-
-A string containing a subroutine which will be passed a host reference and
-should return a number that is compared against other hosts' ratings to
-determine the best host for a new job.  A return of zero indicates this
-host may not be used.  Ratings closer to zero are better.  Defaults to a
-function that includes the load_limit and the cpu percentage free.
-Evaluated in a Safe container, and can do only minimal core functions.
 
 =back
 

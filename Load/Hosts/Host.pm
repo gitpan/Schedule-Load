@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.28 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Host.pm,v 1.29 2003/04/24 13:14:11 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -36,7 +36,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '2.104';
+$VERSION = '3.001';
 
 ######################################################################
 #### Globals
@@ -95,6 +95,20 @@ sub get_undef {
 ######################################################################
 #### Matching
 
+sub host_match {
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
+    my %params = (classes=>[],
+		  match_cb=> undef,
+		  allow_reserved=>1,
+		  @_,
+		  );
+    # For use of Hosts::hosts_match
+    return ($self->classes_match($params{classes})
+	    && $self->eval_match ($params{match_cb})
+	    && (!$self->reserved || $params{allow_reserved})
+	    );
+}
+
 sub classes_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
     my $classesref = shift;
@@ -151,6 +165,21 @@ sub top_processes {
     return (wantarray ? @keys : \@keys);
 }
 
+sub holds {
+    my $self = shift;
+    return if !$self->{dynamic}{holds};
+    return (sort {$a->compare_pri_time($b)} (@{$self->{dynamic}{holds}}));
+}
+
+sub free_cpus {
+    my $self = shift;
+    # How many more jobs host can take before we should turn off new jobs
+    my $free = ($self->cpus - $self->adj_load);
+    $free = 0 if ($free < 0);
+    $free = int ($free + .7);
+    return $free;
+}
+
 sub rating_cb {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->key(key))';
     # How fast can we process a single job?
@@ -202,7 +231,6 @@ sub AUTOLOAD {
     my $type = ref($self) or croak "$self is not an ".__PACKAGE__." object";
     
     (my $field = $AUTOLOAD) =~ s/.*://; # Remove package
-    return if $field eq "DESTROY";
   
     if (exists ($self->{dynamic}{$field})) {
 	# Dynamic variables stay dynamic
@@ -221,6 +249,8 @@ sub AUTOLOAD {
 	croak "$type->$field: Unknown ".__PACKAGE__." field $field";
     }
 }
+
+sub DESTROY {}
 
 ######################################################################
 ######################################################################
@@ -280,12 +310,12 @@ are described below.
 
 =over 4 
 
-=item top_processes
+=item adj_load
 
-Returns a reference to a list of top process objects,
-C<Schedule::Load::Hosts::Proc> to access the information for each process.
-In an array context, returns a list; In a a scalar context, returns a
-reference to a list.
+Total number of processes in run or on processor state, adjusted for any
+jobs that have a specific fixed_load or hold time, and adjusted for jobs
+that have not yet scheduled but are collecting resources for a new run.
+This is the load used for picking hosts.
 
 =item archname
 
@@ -294,6 +324,10 @@ Architecture name from Perl build.
 =item cpus
 
 Number of CPUs.
+
+=item holds
+
+Returns list of C<Schedule::Load::Hosts::Hold> objects, sorted by age.
 
 =item hostname
 
@@ -325,15 +359,16 @@ start time comment.
 
 System type from Perl build.
 
+=item top_processes
+
+Returns a reference to a list of top process objects,
+C<Schedule::Load::Hosts::Proc> to access the information for each process.
+In an array context, returns a list; In a a scalar context, returns a
+reference to a list.
+
 =item total_load
 
 Total number of processes in run or on processor state.
-
-=item adj_load
-
-Total number of processes in run or on processor state, adjusted for any
-jobs that have a specific fixed_load or hold time.  This is the load used
-for picking hosts.
 
 =item total_pctcpu
 

@@ -1,10 +1,38 @@
 Schedule::Load NEWS --  history of user-visible changes.
-Copyright (C) 2002 Wilson Snyder.
+Copyright (C) 2003 Wilson Snyder.
 See the end for copying conditions.
 
 The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
+
+* Changes in Schedule::Load 3.001 5/21/2003
+
+**	This is a major release to add support for scheduling of
+	multiple resources at the same time, and to add a prioritized
+	list of waiters for each resource.
+
+***	The slchoosed process must be restarted to match this package.
+	Slreportd processes are forward and backward compatible.
+
+***	Added Schedule::Load::Hold for information on who needs a host.
+
+***	Added Schedule::Load::ResourceReq for scheduling multiple requests.
+
+***	Added rschedule holds command.
+
+***	Added pid tracking of fixed_loads on fake reporters.
+
+**	Several interface items have been cleaned up.
+	This may break older programs, contact the author if this causes pain.
+
+***	Schedule::Load::Schedule::hosts_of_class is depreciated.
+	Equivelent is hosts_match(classes=>{....}, allow_reserved=>1)
+
+***	Night hours is depreciated.  The default loading is now the
+	full clump, if you wish to use a smaller percentage, make a local
+	derrived class.  Likewise editing of the classes list to add
+	_night suffixes is removed.  (This was never consistently applied.)
 
 * Changes in Schedule::Load 2.104 4/15/2003
 
@@ -116,7 +144,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.36 2003/04/15 15:00:07 wsnyder Exp $
+$Id: NEWS,v 1.39 2003/05/21 18:00:44 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

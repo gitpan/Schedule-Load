@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.39 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Reporter.pm,v 1.43 2003/05/21 17:45:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -32,14 +32,18 @@ use Proc::ProcessTable;
 use Unix::Processors;
 use Storable qw (nstore retrieve);
 use Schedule::Load qw (:_utils);
+use Schedule::Load::FakeReporter;
 use Sys::Hostname;
 use Time::HiRes qw (gettimeofday);
+use IPC::PidStat;
 use Config;
 
 use strict;
 use vars qw($VERSION $Debug %User_Names %Pid_Inherit 
 	    @Pid_Time_Base @Pid_Time $Os_Linux
-	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu);
+	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu
+	    $Exister
+	    );
 use Carp;
 
 ######################################################################
@@ -48,7 +52,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.104';
+$VERSION = '3.001';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -96,7 +100,11 @@ sub start {
 
     my $select = IO::Select->new();
 
+    $Exister = new IPC::PidStat();
+    $select->add($Exister->fh);
+
     $self->pt();	# Create process table
+    $self->fake_pt();	# Create process table
 
     # Load constants
     $self->_fill_const;
@@ -115,6 +123,7 @@ sub start {
 		last if ($self->_open_host($host));
 	    }
 	    $select->remove($select->handles);
+	    $select->add($Exister->fh);
 	    $select->add($self->{socket}) if $self->{socket};
 	}
 
@@ -125,37 +134,41 @@ sub start {
       input:
 	foreach my $fh ($select->can_read ($self->{alive_time})) {
 	    print "Servicing input\n" if $Debug;
-
-	    # Snarf input
-	    if ($inbuffer !~ /\n/) {
-		my $data='';
-		my $rv = $fh->sysread($data, POSIX::BUFSIZ);
-		if (!defined $rv || (length $data == 0)) {
-		    next input;
-		}
-		$inbuffer .= $data;
+	    if ($fh == $Exister->fh) {
+		_exist_traffic();
 	    }
+	    else {
+		# Snarf input
+		if ($inbuffer !~ /\n/) {
+		    my $data='';
+		    my $rv = $fh->sysread($data, POSIX::BUFSIZ);
+		    if (!defined $rv || (length $data == 0)) {
+			next input;
+		    }
+		    $inbuffer .= $data;
+		}
 
-	    while ($inbuffer =~ s/(.*?)\n//) {
-		my $line = $1;
-		chomp $line;
-		print "REQ $line\n" if $Debug;
-		my ($cmd, $params) = _pthaw($line, $Debug);
-		# Commands
-		if ($cmd eq "report_get_dynamic") {
-		    $self->_fill_and_send;
-		} elsif ($cmd eq "report_fwd_set") {
-		    $self->_set_stored($params);
-		} elsif ($cmd eq "report_fwd_comment") {
-		    $self->_comment($params);
-		} elsif ($cmd eq "report_fwd_fixed_load") {
-		    $self->_fixed_load($params);
-		} elsif ($cmd eq "report_restart") {
-		    # Overall fork loop will deal with it.
-		    warn "-Info: report_restart\n" if $Debug;
-		    exit(0);
-		} else {
-		    warn "%Error: Bad request from server: $line\n" if $Debug;
+		while ($inbuffer =~ s/(.*?)\n//) {
+		    my $line = $1;
+		    chomp $line;
+		    print "REQ $line\n" if $Debug;
+		    my ($cmd, $params) = _pthaw($line, $Debug);
+		    # Commands
+		    if ($cmd eq "report_get_dynamic") {
+			$self->_fill_and_send;
+		    } elsif ($cmd eq "report_fwd_set") {
+			$self->_set_stored($params);
+		    } elsif ($cmd eq "report_fwd_comment") {
+			$self->_comment($params);
+		    } elsif ($cmd eq "report_fwd_fixed_load") {
+			$self->_fixed_load($params);
+		    } elsif ($cmd eq "report_restart") {
+			# Overall fork loop will deal with it.
+			warn "-Info: report_restart\n" if $Debug;
+			exit(0);
+		    } else {
+			warn "%Error: Bad request from server: $line\n" if $Debug;
+		    }
 		}
 	    }
 	}
@@ -172,6 +185,15 @@ sub pt {
 	$self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 ); 
     }
     return $self->{pt};
+}
+
+sub fake_pt {
+    my $self = shift;
+    if (!$self->{fake_pt}) {
+	$self->{fake_pt} = Schedule::Load::FakeReporter::ProcessTable
+	    ->new (reportref=>$self);
+    }
+    return $self->{fake_pt};
 }
 
 ######################################################################
@@ -193,6 +215,7 @@ sub _open_host {
     $self->{socket} = undef if (!$fh || !$fh->connected());
     if ($self->{socket}) {
 	# Send constants to the host, that will tell it we live
+	$self->{stored_read} = 0;   # Reread stored info in case redundant reporters
 	$self->{const_changed} = 1;
 	$self->{const}{_update} = 0;
 	$self->_fill_and_send;
@@ -316,17 +339,21 @@ sub _fill_dynamic {
     @Pid_Time_Base = ($sec,$usec);
 
     # Note the $p refs cannot be cached, they change when a new table call occurs
-    my $pidlist = $self->pt->table;
+    my @pidlist;
+    if (!$self->{fake}) {
+	push @pidlist, @{$self->pt->table};
+    }
+    push @pidlist, @{$self->fake_pt->table};
 
     my %pidinfo = ();
 
     # Find all parental references (should cache this at some point)
-    foreach my $p (@{$pidlist}) {
+    foreach my $p (@pidlist) {
 	$pidinfo{$p->pid}{parent} = $p->ppid;
     }
 
     # Push all logit's down towards parents
-    foreach my $p (@{$pidlist}) {
+    foreach my $p (@pidlist) {
 	# See which PIDs we will log
 	my $pctcpu = $p->pctcpu || 0;
 	$pctcpu = 0 if ($pctcpu eq "inf");	# Linux
@@ -370,13 +397,12 @@ sub _fill_dynamic {
 	}
     }
 
-    foreach my $p (@{$pidlist}) {
+    foreach my $p (@pidlist) {
 	my $fixed_load = undef;
 	my $cmndcomment = undef;
 	my $logit = $pidinfo{$p->pid}{logit};
 	if ($p->uid) { # not root
 	    my $searchpid = $p->pid;
-	    my $indent = 0;
 	    while ($searchpid) {
 		if (defined $Pid_Inherit{$searchpid}) {
 		    if ((!defined $fixed_load)
@@ -418,7 +444,8 @@ sub _fill_dynamic {
     # Look for any fixed loads that died
     # Also add up fixed loading across all fixed_loads
     foreach my $pid (keys %Pid_Inherit) {
-	if (!defined $pidinfo{$pid}) {
+	if (!defined $pidinfo{$pid}
+	    && $Pid_Inherit{$pid}{req_hostname} eq hostname()) {  # Not a fake load on a remote host
 	    delete $Pid_Inherit{$pid};
 	} else {
 	    my $fixed_load = $Pid_Inherit{$pid}{fixed_load};
@@ -440,7 +467,10 @@ sub _fixed_load {
     my $pid = $params->{pid};
     print "Fixed load of $load PID $pid\n" if $Debug;
     $Pid_Inherit{$pid}{fixed_load} = $load;
+    $Pid_Inherit{$pid}{pid} = $params->{pid};
     $Pid_Inherit{$pid}{uid} = $params->{uid};
+    $Pid_Inherit{$pid}{req_pid} = $params->{req_pid};
+    $Pid_Inherit{$pid}{req_hostname} = $params->{req_hostname} || $params->{host} || hostname();
     if ($load==0) {
 	delete $Pid_Inherit{$pid};
     }
@@ -453,8 +483,9 @@ sub _comment {
     my $cmndcomment = $params->{comment};
     my $pid = $params->{pid};
     print "Command Commentary '$cmndcomment' PID $pid\n" if $Debug;
-    $Pid_Inherit{$pid}{cmndcomment} = $cmndcomment;
+    $Pid_Inherit{$pid}{pid} = $pid;
     $Pid_Inherit{$pid}{uid} = $params->{uid};
+    $Pid_Inherit{$pid}{cmndcomment} = $cmndcomment;
 }
 
 ######################################################################
@@ -469,6 +500,24 @@ sub _send_hash {
     return if !$fh;
     my $ok = $fh->send_and_check(_pfreeze("report_$field", $self->{$field}, $Debug));
     if (!$ok || !$fh || !$fh->connected()) { $self->{socket} = undef; }
+}
+
+######################################################################
+######################################################################
+#### Existance
+
+sub _exist_traffic {
+    # Handle UDP responses from our $Exister->pid_request calls.
+    print "UDP PidStat in...\n" if $Debug;
+    my ($pid,$exists,$onhost) = $Exister->recv_stat();
+    return if !defined $pid;
+    return if $exists;   # We only care about known-missing processes
+    print "  UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n" if $Debug;
+    foreach my $pref (values %Pid_Inherit) {
+	if ($pref && $pref->{req_pid}==$pid && $pref->{req_hostname} eq $onhost) {
+	    delete $Pid_Inherit{$pref->{pid}};
+	}
+    }
 }
 
 ######################################################################
@@ -571,6 +620,11 @@ host is only used if the first is down, and so on down the list.
 
 The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 /etc/services, else 1752.
+
+=item fake
+
+Specifies load management should not be used, for reporting of a "fake"
+hosts' status or scheduling a non-host related resource, like a license.
 
 =item min_pctcpu
 

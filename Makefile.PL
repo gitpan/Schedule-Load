@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.14 2002/08/14 18:49:28 wsnyder Exp $
+# $Id: Makefile.PL,v 1.15 2003/04/24 13:14:09 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 
 require 5.005;
@@ -13,6 +13,9 @@ install::
 
 install-here::
 	make INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 INSTALLBIN=/usr/local/bin INSTALLSCRIPT=/usr/local/bin install
+
+install-test::
+	make INSTALLMAN1DIR=/usr/local/man/man1 INSTALLMAN3DIR=/usr/local/man/man3 INSTALLBIN=/usr/local/test/bin INSTALLSCRIPT=/usr/local/test/bin INSTALLSITELIB=/usr/local/test/lib INSTALLSITEARCH=/usr/local/test/lib/i686-linux install
 
 README: readme.texi
 	-rm \$@
@@ -44,6 +47,7 @@ WriteMakefile(
 			    'Unix::Processors' => 1.7,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,
+			    'IPC::PidStat' => 1.410,
 			},
 	      EXE_FILES	=> [qw( rschedule slchoosed slreportd slpolice slrsh)],
 	      'clean'	=> {FILES => 'test_store', },

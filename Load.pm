@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.55 2003/04/15 15:00:05 wsnyder Exp $
+# $Id: Load.pm,v 1.57 2003/05/07 23:58:16 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -35,7 +35,7 @@ use Sys::Hostname;
 use Storable qw (nfreeze thaw);
 use Socket;
 require Exporter;
-BEGIN { eval 'use Data::Dumper';}	#Ok if doesn't exist: debugging only
+BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
 use POSIX qw (EWOULDBLOCK BUFSIZ);
 use strict;
 use Carp;
@@ -43,7 +43,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '2.104';
+$VERSION = '3.001';
 $Debug = 0;
 
 %_Default_Params = (
@@ -224,6 +224,13 @@ Perl module):
 
 =over 4 
 
+=item rschedule
+
+C<rschedule> is a command line interface to this package.  It and the
+aliases C<rtop>, C<rhosts>, and C<rloads> report the current state of the
+network including hosts and top loading.  C<rschedule> also allows reserving
+hosts and setting the classes of the machines, as described later.
+
 =item slreportd
 
 C<slreportd> is run on every host in the network, usually started with a
@@ -244,19 +251,18 @@ updated information from the reporters, and returns the information to the
 user client.  As the chooser has the entire network state, it can also
 choose the best host across all CPUs in the network.
 
-=item rschedule
-
-C<rschedule> is a command line interface to this package.  It and the
-aliases C<rtop>, C<rhosts>, and C<rloads> report the current state of the
-network including hosts and top loading.  C<rschedule> also allows reserving
-hosts and setting the classes of the machines, as described later.
-
 =item slpolice
 
 C<slpolice> is a optional client daemon which is run as a C<cron> job.
 When a user process has over a hour of CPU time, it C<nice>s that process
 and sends mail to the user.  It is intended as a example which can be used
 directly or changed to suit the system manager preferences.
+
+=item lockerd
+
+C<lockerd> is part of the C<IPC::PidStat> package.  If running, it allows
+the scheduler to automatically cancel held resources if the process that
+requested the resource exits or is even killed without cleaning up.
 
 =back
 
@@ -326,15 +332,16 @@ etc.
 
 =head1 HOLD KEYS
 
-When a best host is picked for a new job, there is often a lag before a
-process actually starts up on the selected host, and enough CPU time
-elapses for that new process to claim CPU time.  To prevent another job
-from scheduling onto that host during this lag, scheduling calls may
-specify a hold key.  For a limited time, the load on the host will be
-incremented.  When the job begins and a little CPU time has elapsed a
-hold_release call may be made, (or the timer expires), which releases the
-hold.  This will cause the load reported by C<rschedule hosts> to
-occasionally be higher then the number of jobs on that host.
+Hold keys allow a job request to be queued, so that when the resource is
+freed, it will be issued to the oldest requestor.  The hold will persist
+for a specified time until a process actually starts up on the selected
+host, and enough CPU time elapses for that new process to claim CPU time.
+
+For a this limited time, the load on the host will be incremented.  When
+the job begins and a little CPU time has elapsed the hold is released with
+a hold_release call, the timer expiring, or IPC::PidStat detecting the
+holding process died.  This will cause the load reported by C<rschedule
+hosts> to occasionally be higher then the number of jobs on that host.
 
 =head1 FIXED LOADS
 

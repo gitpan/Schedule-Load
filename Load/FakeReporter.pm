@@ -1,5 +1,5 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.11 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: FakeReporter.pm,v 1.15 2003/05/21 17:45:04 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -23,50 +23,14 @@ require 5.004;
 @ISA = qw(Schedule::Load::Reporter);
 
 use strict;
-use vars qw($VERSION $Debug
-	    );
+use vars qw($VERSION);
 use Carp;
 use POSIX;
 
 ######################################################################
 #### Configuration Section
 
-# Other configurable settings.
-$Debug = $Schedule::Load::Debug;
-
-$VERSION = '2.104';
-
-######################################################################
-#### Globals
-
-# This is the self elemenst sent over the socket:
-# $self->{const}{config_element_name} = value	# Such as things from ENV
-# $self->{load}{load_element} = value		# Overall loading info
-# $self->{proc}{process#}{proc_element} = value	# Per process info
-
-######################################################################
-#### Creator
-
-#Inherited:
-sub start {
-    my $proto = shift;
-    my $class = ref($proto) || $proto;
-
-    my $self = $proto->SUPER::start(@_);
-    bless $self, $class;
-}
-
-######################################################################
-#### Accessors
-
-sub pt {
-    my $self = shift;
-    if (!$self->{pt}) {
-	$self->{pt} = Schedule::Load::FakeReporter::ProcessTable
-	    ->new (reportref=>$self);
-    }
-    return $self->{pt};
-}
+$VERSION = '3.001';
 
 ######################################################################
 #### Local process table
@@ -74,6 +38,8 @@ sub pt {
 package Schedule::Load::FakeReporter::ProcessTable;
 use vars qw (@ISA);
 #Same functions as: @ISA = qw(Proc::ProcessTable);
+use IPC::PidStat;
+use Sys::Hostname;
 use strict;
 
 sub new {
@@ -93,52 +59,44 @@ sub table {
     $pid_track=1 if !defined $pid_track;
 
     while (my ($pid,$pref) = each %Schedule::Load::Reporter::Pid_Inherit) {
-	if ($pid_track && local_pid_doesnt_exist($pid)) {
-	    # Process being tracked died.  fill_dynamic will delete the hash element 
-	    return;
+	if ($pid_track) {
+	    if ($pref->{req_hostname} eq hostname()) {
+		if (IPC::PidStat::local_pid_doesnt_exist($pid)) {
+		    # Process being tracked died.  fill_dynamic will delete the hash element 
+		    delete $Schedule::Load::Reporter::Pid_Inherit{$pid};
+		    next;
+		} elsif (!$self->{reportref}{fake}) {
+		    # Process exists and this isn't a fake reporter.  We'll get real CPU information
+		    # from the reporter
+		    next;
+		}
+	    } else {
+		# Remote process, launch a request to make sure it's still alive
+		$Schedule::Load::Reporter::Exister->pid_request(host=>$pref->{req_hostname},
+								pid=>$pref->{req_pid},);
+	    }
 	}
-	$pref->{start} ||= time();
-	my $pctcpu = 100*int(($pref->{fixed_load}||1)/ $load_limit);
-	my $proc = Schedule::Load::FakeReporter::ProcessTable::Process->new
-	    (pid=>$pid,
-	     ppid=>0,
-	     pctcpu=>$pctcpu,
-	     utime=>0, stime=>0,
-	     start=>$pref->{start},
-	     time=>(time()-$pref->{start})*1000.0*($pctcpu/100),  # Is in msec
-	     uid=>$pref->{uid}||0,
-	     state=>'run',
-	     priority=>1,
-	     fname=>'fake_process',
-	     size=>1,
-	     );
-	push @pids, $proc;
-	#print "PIDINH $pid $proc   $pref->{start} ",time(),"\n";
+        if ($pref->{fixed_load}) {  # Else it might only be a comment
+	    $pref->{start} ||= time();
+	    my $pctcpu = 100*int(($pref->{fixed_load}||1)/ $load_limit);
+	    my $proc = Schedule::Load::FakeReporter::ProcessTable::Process->new
+		(pid=>$pid,
+		 ppid=>0,
+		 pctcpu=>$pctcpu,
+		 utime=>0, stime=>0,
+		 start=>$pref->{start},
+		 time=>(time()-$pref->{start})*1000.0*($pctcpu/100),  # Is in msec
+		 uid=>$pref->{uid}||0,
+		 state=>'run',
+		 priority=>1,
+		 fname=>'fake_process',
+		 size=>1,
+		 );
+	    push @pids, $proc;
+	    #print "PIDINH $pid $proc   $pref->{start} ",time(),"\n";
+	}
     }
     return \@pids;
-}
-
-#### Utilities
-
-sub local_pid_doesnt_exist {
-    my $result = local_pid_exists(@_);
-    # Return 0 if a pid exists, 1 if not, undef (or second argument) if unknown
-    return undef if !defined $result;
-    return !$result;
-}
-
-sub local_pid_exists {
-    my $pid = shift;
-    # Return 1 if a pid exists, 0 if not, undef (or second argument) if unknown
-    # We can't just call kill, because if there's a different user running the
-    # process, we'll get an error instead of a result.
-    $! = undef;
-    my $exists = (kill (0,$pid))?1:0;
-    if ($!) {
-	$exists = undef;
-	$exists = 0 if $! == POSIX::ESRCH;
-    }
-    return $exists;
 }
 
 package Schedule::Load::FakeReporter;
@@ -162,15 +120,15 @@ sub new {
 sub AUTOLOAD {
     my $self = shift;
     (my $field = $AUTOLOAD) =~ s/.*://; # Remove package
-    return if $field eq "DESTROY";
-  
     if (exists ($self->{$field})) {
-	eval "sub $field { my \$self=shift; return \$self->{$field}; }";
+	eval "sub $field { return \$_[0]->{$field}; }";
 	return $self->{$field};
     } else {
 	croak "$self->$field: Unknown ".__PACKAGE__." field $field";
     }
 }
+
+sub DESTROY {}
 
 package Schedule::Load::FakeReporter;
 
@@ -190,30 +148,24 @@ Schedule::Load::FakeReporter - Distributed load reporting daemon
 
 =head1 SYNOPSIS
 
-  use Schedule::Load::FakeReporter;
+  use Schedule::Load::Reporter;
 
-  Schedule::Load::FakeReporter->start();
+  Schedule::Load::Reporter->start(fake=>1);
 
 =head1 DESCRIPTION
 
-C<Schedule::Load::FakeReporter> creates a C<Schedule::Load::Reporter>
-derrived class, which allows replacing the normal host information with
-special fixed information.  This allows the Schedule::Load facilities to be
-used to manage other resources, such as labratory equipment, that has CPU
-like status, but cannot locally run slreportd.
+C<Schedule::Load::FakeReporter> creates a
+C<Schedule::Load::Reporter::ProcessTable> similar to C<Proc::ProcessTable>,
+which allows replacing the normal host information with special fixed
+information.  This allows the Schedule::Load facilities to be used to
+manage other resources, such as labratory equipment, that has CPU like
+status, but cannot locally run slreportd.
 
 Pctcpu is based on the load_limit or if unspecified, each fixed load counts
 as 100%.  Pid is the process ID that should be tracked on the current CPU,
 if this is not desired, add a pid_track=0 attribute.
 
-
 See C<Schedule::Load::Reporter> for most accessors.
-
-=head1 PARAMETERS
-
-=over 4
-
-=back
 
 =head1 SEE ALSO
 

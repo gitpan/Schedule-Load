@@ -2,10 +2,12 @@ COPYING
 Load.pm
 Load/Chooser.pm
 Load/FakeReporter.pm
+Load/Hold.pm
 Load/Hosts.pm
 Load/Hosts/Host.pm
 Load/Hosts/Proc.pm
 Load/Reporter.pm
+Load/ResourceReq.pm
 Load/Schedule.pm
 MANIFEST
 Makefile.PL

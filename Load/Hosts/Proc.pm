@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Proc.pm -- Process information
-# $Id: Proc.pm,v 1.18 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Proc.pm,v 1.19 2003/04/23 20:07:35 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -34,7 +34,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '2.104';
+$VERSION = '3.001';
 
 ######################################################################
 #### Globals
@@ -66,13 +66,17 @@ sub get {
 sub time_hhmm {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->get(field))';
     return undef if (!defined $self->{time});
-    my $runtime = $self->time;
+    return $self->format_hhmm($self->time);
+}
+
+sub format_hhmm {
+    my $self = shift;
+    my $runtime = shift;
     if ($runtime >= 2*3600) {
-	$runtime = sprintf "%3.1fH", int($runtime/360)/10;
+	return sprintf "%3.1fH", int($runtime/360)/10;
     } else {
-	$runtime = sprintf "%3d:%02d", int($runtime/60), $runtime%60;
+	return sprintf "%3d:%02d", int($runtime/60), $runtime%60;
     }
-    return $runtime;
 }
 
 ######################################################################
@@ -83,15 +87,14 @@ sub AUTOLOAD {
     my $type = ref($self) or croak "$self is not an ".__PACKAGE__." object";
     
     (my $field = $AUTOLOAD) =~ s/.*://; # Remove package
-    return if $field eq "DESTROY";
-  
     if (exists ($self->{$field})) {
-	eval "sub $field { my \$self=shift; return \$self->{$field}; }";
+	eval "sub $field { return \$_[0]->{$field}; }";
 	return $self->{$field};
     } else {
 	croak "$type->$field: Unknown ".__PACKAGE__." field $field";
     }
 }
+sub DESTROY {}
 
 ######################################################################
 #### Package return
@@ -135,7 +138,7 @@ Returns the value of a specific field for this process.
 
 A accessor exists for each field returned by the fields() call.  Typical
 elements are described below.  All fields that C<Proc::ProcessTable>
-supports are also included here.
+supports are also accessable.
 
 =over 4 
 

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $
+# $Id: slchoosed,v 1.21 2003/05/08 20:12:52 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -125,7 +125,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.21 2003/05/08 20:12:52 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -133,7 +133,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.20 2002/08/04 18:36:23 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.21 2003/05/08 20:12:52 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -171,12 +171,15 @@ package.
 =over 4
 
 =item --help
+
 Displays this message and program version and exits.
 
 =item --port
+
 Specifies the port number that slchoosed uses.
 
 =item --dhost
+
 Specifies the daemon host name that slchoosed uses.  May be specified
 multiple times to specify backup hosts.  Defaults to SLCHOOSED_HOST
 environment variable, which contains colon separated host names.  When
@@ -185,6 +188,7 @@ backup hosts, and are sent a reset so that this host may takeover the
 choosing task.
 
 =item --version
+
 Displays program version and exits.
 
 =back

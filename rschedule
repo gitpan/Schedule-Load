@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.31 2003/04/15 14:58:12 wsnyder Exp $
+# $Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -143,6 +143,8 @@ sub cmd {
 	push @commands, sub { print $scheduler->print_hosts; };
     } elsif ($param eq "idle_host_names") {
 	push @commands, sub { print join(' ',$scheduler->idle_host_names(classes=>\@opt_classes,)),"\n"; };
+    } elsif ($param eq "holds") {
+	push @commands, sub { print $scheduler->print_holds; };
     } elsif ($param eq "hostnames") {
 	push @commands, sub { print join(' ',$scheduler->hostnames(classes=>\@opt_classes,)),"\n"; };
     } elsif ($param eq "jobs") {
@@ -219,7 +221,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.31 2003/04/15 14:58:12 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -227,7 +229,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.31 2003/04/15 14:58:12 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.32 2003/04/24 13:14:09 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -269,6 +271,8 @@ B<rhosts>
 
 B<rschedule> B<loads>
 B<rloads>
+
+B<rschedule> B<holds>
 
 B<rschedule> B<status>
 
@@ -335,6 +339,10 @@ Sets the hostname to deny the specified class of jobs.
 Sets the given process ID to have that process count as one host load, even
 if it is using less CPU time then that due to high disk activity or other
 sleeps.
+
+=item holds
+
+Displays a listing of jobs that are blocked waiting for resources.
 
 =item hosts
 

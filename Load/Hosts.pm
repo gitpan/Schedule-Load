@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.50 2003/04/15 15:00:07 wsnyder Exp $
+# $Id: Hosts.pm,v 1.56 2003/04/28 18:24:18 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2002 by Wilson Snyder.
@@ -26,6 +26,7 @@ require Exporter;
 use Socket;
 use POSIX qw (EWOULDBLOCK BUFSIZ);
 use Schedule::Load qw(:_utils);
+use Schedule::Load::Hold;
 use Schedule::Load::Hosts::Host;
 use Schedule::Load::Hosts::Proc;
 use Time::localtime;
@@ -41,7 +42,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.104';
+$VERSION = '3.001';
 
 ######################################################################
 #### Globals
@@ -72,7 +73,7 @@ sub fetch {
     # Erase current structures in case a host goes down
     delete $self->{hosts};
     # Make the request
-    $self->_request("get_const_load_proc\n");
+    $self->_request("get_const_load_proc_chooinfo\n");
     $self->{_fetched} = 1;
     return $self;
 }
@@ -106,7 +107,7 @@ sub _chooser_close_all {
 
 sub hosts {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
-    # Return all hosts, potentially matching given classes
+    # Return all hosts
 
     $self->_fetch_if_unfetched;
     my @keys;
@@ -114,6 +115,32 @@ sub hosts {
 	push @keys, $host if ($host->exists('hostname') && $host->hostname);
     }
     @keys = (sort {$a->hostname cmp $b->hostname} @keys);
+    return (wantarray ? @keys : \@keys);
+}
+
+sub hosts_match {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts_match()';
+    my %params = (#classes=>[],		# Passed to Host::host_match
+		  #match_cb=>0,		# Passed to Host::host_match
+		  #allow_reserved=>1,	# Passed to Host::host_match
+		  @_);
+    # Return all hosts matching parameters
+    $self->_fetch_if_unfetched;
+    my @keys;
+    foreach my $host ($self->hosts) {
+	push @keys, $host if $host->host_match(%params);
+    }
+    return (wantarray ? @keys : \@keys);
+}
+
+sub schreq_holds {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->schreqs_holds()';
+    # Return all hosts matching parameters
+    $self->_fetch_if_unfetched;
+    my @keys;
+    foreach my $hold (values(%{$self->{chooinfo}{schreqs}})) {
+	push @keys, $hold;
+    }
     return (wantarray ? @keys : \@keys);
 }
 
@@ -146,28 +173,29 @@ sub classes {
 
 sub cpus {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->classes()';
-    my %params = @_;
+    my %params = (#classes=>[],		# Passed to Host::host_match
+		  #match_cb=>0,		# Passed to Host::host_match
+		  allow_reserved=>1,	# Passed to Host::host_match
+		  @_);
     # Return number of cpus for a given class
-
     $self->_fetch_if_unfetched;
     my $jobs = 0;
-    foreach my $host ( @{$self->hosts} ){
-	if ($host->classes_match ($params{classes})) {
-	    $jobs += $host->cpus();
-	}
+    foreach my $host ($self->hosts_match(%params)) {
+	$jobs += $host->cpus();
     }
     return $jobs;
 }
 
 sub hostnames {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
-    my %params = @_;
+    my %params = (#classes=>[],		# Passed to Host::host_match
+		  #match_cb=>0,		# Passed to Host::host_match
+		  allow_reserved=>1,	# Passed to Host::host_match
+		  @_);
     # Return hostnames, potentially matching given classes
     my @hnames;
-    foreach my $host ($self->hosts) {
-	if ($host->classes_match ($params{classes})) {
-	    push @hnames, $host->hostname;
-	}
+    foreach my $host ($self->hosts_match(%params)) {
+	push @hnames, $host->hostname;
     }
     @hnames = (sort @hnames);
     return (wantarray ? @hnames : \@hnames);
@@ -175,26 +203,29 @@ sub hostnames {
 
 sub idle_host_names {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
-    my %params = @_;
+    my %params = (#classes=>[],		# Passed to Host::host_match
+		  #match_cb=>0,		# Passed to Host::host_match
+		  allow_reserved=>0,	# Passed to Host::host_match
+		  #ign_pctcpu=>0,
+		  #by_pctcpu=>0,
+		  @_);
     # Return idle hosts, potentially matching given classes
     # Roughly scaled so even powered hosts have even representation
 
     my @hnames;
-    foreach my $host ($self->hosts) {
-	if ($host->classes_match ($params{classes})
-	    && !$host->reserved) {
-	    my $idleCpus = $host->cpus;
-	    if ($params{ign_pctcpu}) {
-	    } elsif ($params{by_pctcpu}) {  # min of adj_load or percentage
-		my $adj = (($host->cpus * $host->total_pctcpu / 100) - 0.2);  # 80% used? squeeze another in
-		$adj = 0 if $adj<0;
-		$idleCpus -= $adj;
-	    } else {
-		$idleCpus -= $host->adj_load
-	    }
-	    for (my $c=0; $c<$idleCpus; $c++) {
-		push @hnames, $host->hostname;
-	    }
+    foreach my $host ($self->hosts_match(%params)) {
+	my $idleCpus = $host->cpus;
+	if ($params{ign_pctcpu}) {
+	} elsif ($params{by_pctcpu}) {  # min of adj_load or percentage
+	    $idleCpus = $host->cpus;
+	    my $adj = (($host->cpus * $host->total_pctcpu / 100) - 0.2);  # 80% used? squeeze another in
+	    $adj = 0 if $adj<0;
+	    $idleCpus -= $adj;
+	} else {
+	    $idleCpus = $host->free_cpus;
+	}
+	for (my $c=0; $c<$idleCpus; $c++) {
+	    push @hnames, $host->hostname;
 	}
     }
     @hnames = (sort @hnames);
@@ -219,20 +250,17 @@ sub print_hosts {
     my $hosts = shift;
     # Overall machine status
     my $out = "";
-    (my $FORMAT =           "%-12s    %4s     %4s   %6s%%       %5s   %5s     %2s    %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "%-12s    %4s     %4s   %6s%%       %5s   %6s     %2s    %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "RATE", "RL", "ARCH/OS");
     foreach my $host ( @{$hosts->hosts} ){
 	my $ostype = $host->archname ." ". $host->osvers;
-	foreach (sort ($host->fields)) {
-	    $ostype .= " $_";
-	}
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
 		       $host->cpus, 
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
-		       $host->adj_load, 
+		       $host->adj_load,
 		       $host->rating_text,
 		       ( ($host->reservable?"R":" ")
 			 . digit($host,'load_limit')),
@@ -242,11 +270,66 @@ sub print_hosts {
     return $out;
 }
 
+sub print_holds {
+    my $hosts = shift;
+    # Holding commands
+    my %holdlist;
+    my $i=0;
+    foreach my $host ($hosts->hosts) {
+	foreach my $hold ($host->holds) {
+	    $i++;
+	    my $key = $hold->req_user."_".$hold->req_hostname."_".$hold->req_pid
+		."_".$hold->hold_key."_".$host->hostname."_".$i;
+	    $holdlist{$key} = {hold => $hold,
+			       host => $host,
+			       code => ($hold->allocated?"A":"S"),};
+	}
+    }
+    foreach my $hold ($hosts->schreq_holds) {
+	my $key = $hold->req_user."_".$hold->req_hostname."_".$hold->req_pid
+	    ."_".$hold->hold_key."_CHOO_".$i;
+	$holdlist{$key} = {hold => $hold,
+			   host => undef,
+		           code => "P",};
+    }
+    my $out = "";
+    (my $FORMAT =           "%-8s   %-12s    %5s      %5s   %2s  %1s   %7s    %-12s %-s\n") =~ s/\s\s+/ /g;
+    $out.=sprintf ($FORMAT, "USER", "UHOST", "UPID", "PRI", "L", "S", "WAIT", "ON_HOST", "COMMENT");
+    foreach my $key (sort (keys %holdlist)) {
+	my $hold = $holdlist{$key}{hold};
+	my $host = $holdlist{$key}{host};
+	$out.=sprintf ($FORMAT,
+		       $hold->req_user,
+		       $hold->req_hostname,
+		       $hold->req_pid,
+		       $hold->req_pri,
+		       $hold->hold_load,
+		       $holdlist{$key}{code},
+		       Schedule::Load::Hosts::Proc->format_hhmm(time() - $hold->req_time),
+		       #
+		       ($host ? $host->hostname : "{pending}"), 
+		       $hold->comment,
+		       );
+    }
+    return $out;
+}
+
 sub print_status {
     my $hosts = shift;
     # Daemon status, mostly for debugging
     my $out = "";
-    (my $FORMAT =           "%-12s  %6s%%     %5s     %5s    %-17s          %s\n") =~ s/\s\s+/ /g;
+    {
+	(my $FORMAT =           "%-12s     %-17s        %s\n") =~ s/\s\s+/ /g;
+	$out.=sprintf ($FORMAT, "CHOOSER", "CONNECTED", "DAEMON STATUS");
+	my $t = localtime($hosts->{chooinfo}{slchoosed_connect_time});
+	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
+	$out.=sprintf ($FORMAT,
+		       $hosts->{chooinfo}{slchoosed_hostname},
+		       $tm,
+		       $hosts->{chooinfo}{slchoosed_status});
+    }
+
+    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-17s          %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DAEMON STATUS");
     foreach my $host ( @{$hosts->hosts} ){
 	my $t = localtime($host->slreportd_connect_time);
@@ -477,8 +560,10 @@ sub _request {
 		$done = 1;
 	    } elsif ($cmd eq "host") {
 		$self->_host_load ($params);
-	    } elsif ($cmd eq "best") {
-		$self->{_best} = $params;
+	    } elsif ($cmd eq "schrtn") {
+		$self->{_schrtn} = $params;
+	    } elsif ($cmd eq "chooinfo") {
+		$self->{chooinfo} = $params;
 	    } else {
 		warn "%Warning: Bad Schedule::Load server response: $line\n";
 		$line = undef;
@@ -595,6 +680,14 @@ parameter if true (default) restarts reporter.
 Returns the host objects, accessable with C<Schedule::Load::Hosts::Host>.
 In an array context, returns a list; In a a scalar context, returns a
 reference to a list.
+
+=item hosts_match (...)
+
+Returns C<Schedule::Load::Hosts::Host> objects for every host that matches
+the specified criteria.  Criteria are named parameters, as described in
+Schedule::Load::Schedule, of the following: classes specifies an arrayref
+of allowed classes.  match_cb is a routine returning true if this host
+matches.  allow_reserved=>0 disables returning of reserved hosts.
 
 =item idle_host_names (...)
 
