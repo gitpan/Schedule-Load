@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -Tw
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $
+# $Id: slchoosed,v 1.14 2001/12/06 18:24:47 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -23,8 +23,10 @@
 
 require 5.004;
 use lib 'blib/lib';	# testing
+use FindBin qw($Script);
 use Getopt::Long;
 use Pod::Text;
+use Sys::Syslog;
 use Schedule::Load::Chooser;
 use POSIX;
 use strict;
@@ -86,20 +88,28 @@ if ($opt_quiet && !$Debug) {
 
 # Loop in case something kills us
 while (1) {
-    print "Starting server\n" if $Debug;
+    print "Starting server: $0\n" if $Debug;
+    if (!$Debug) {
+	openlog($Script, 'cons,pid', 'daemon');
+	syslog('info', 'Started');
+	closelog();
+    }
     my $pid;
-    unless ($pid = fork) {
+    if (!$opt_fork || (0==($pid = fork()))) {
         Schedule::Load::Chooser->start (%server_params,
 					restart	=> sub {},
 					);
 	exit(0);
     }
+    die "%Error: Server aborted\n" if !$opt_fork;
+    
     waitpid($pid,0);
     warn "%Warning: Server aborted\n";
     sleep(1);
     kill 9, $pid;
     sleep(1);
     # Restart this program by re-execing; allows users to restart the daemon
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
     exec $0, @Orig_ARGV if -r $0;
 }
 
@@ -108,7 +118,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.14 2001/12/06 18:24:47 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -116,7 +126,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.14 2001/12/06 18:24:47 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.22 2001/11/28 19:19:50 wsnyder Exp $
+# $Id: Reporter.pm,v 1.24 2001/12/06 18:14:45 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.6';
+$VERSION = '1.7';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
@@ -109,6 +109,7 @@ sub start {
 	    foreach my $host (@{$self->{dhost}}) {
 		last if ($self->_open_host($host));
 	    }
+	    $select->remove($select->handles);
 	    $select->add($self->{socket}) if $self->{socket};
 	}
 
@@ -149,7 +150,7 @@ sub _open_host {
     my $self = shift;
     my $host = shift;
     # Open a socket to the given host return true if successful
-    
+
     print "Trying host $host $self->{port}\n" if $Debug;
     my $fh = Schedule::Load::Socket->new(
 					 PeerAddr  => $host,
@@ -157,11 +158,13 @@ sub _open_host {
 					 Timeout   => $self->{timeout},
 				         );
     $self->{socket} = $fh;
+    $self->{socket} = undef if (!$fh || !$fh->connected());
     if ($self->{socket}) {
 	# Send constants to the host, that will tell it we live
 	$self->_send_hash('const');
 	$self->_fill_and_send;
     }
+    print "   Host $host $self->{port} is ".($self->{socket}?"up":"down")."!\n" if $Debug;
     return $self->{socket};
 }
 
@@ -173,6 +176,7 @@ sub _alive_check {
     # Below may die if slchoosed goes down:
     # Our fork() loop will catch it and restart
     print $fh $msg;
+    if (!$fh || !$fh->connected()) { $self->{socket} = undef; }
 }
 
 ######################################################################
@@ -415,7 +419,9 @@ sub _send_hash {
     # Send the hash over the file handle
 
     my $fh = $self->{socket};
+    return if !$fh;
     print $fh _pfreeze("report_$field", $self->{$field}, $Debug);
+    if (!$fh || !$fh->connected()) { $self->{socket} = undef; }
 }
 
 ######################################################################

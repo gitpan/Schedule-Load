@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.17 2001/11/09 15:34:22 wsnyder Exp $
+#$Id: test.pl,v 1.18 2001/12/06 18:24:47 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -12,7 +12,6 @@ use Test;
 BEGIN { plan tests => 3 }
 
 $SIG{INT} = \&cleanup_and_exit;
-#$Debug = 1;
 
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
@@ -59,10 +58,10 @@ mkdir ('test_store', 0777);
 # Start servers
 
 if (1) {
-    start_server ("./slchoosed");
+    start_server ("./slchoosed --nofork");
     sleep 1;
     start_server ("./slreportd class_verilog=1 reservable=1 --nofork --stored_filename=./test_store/".hostname());
-    check_server_up(8);  # 2*(4 children: perl, sh, daemon master, daemon slave)
+    check_server_up(6);  # (6 children: perl, sh, choose sh, choose, report sh, report)
     sleep 5;
 }
 

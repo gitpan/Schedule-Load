@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.23 2001/11/28 19:19:50 wsnyder Exp $
+# $Id: Chooser.pm,v 1.25 2001/12/06 18:14:45 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.6';
+$VERSION = '1.7';
 
 ######################################################################
 #### Globals
@@ -286,7 +286,7 @@ sub _client_send {
     my $fh = $client->{socket};
     while ($out ne "") {
 	my $rv = eval { return $fh->send($out, 0); };
-	if ($! && $! != POSIX::EWOULDBLOCK) {
+	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
 	    # EOF???
 	    _client_close ($client);
 	    return 0;

@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $
+# $Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -29,6 +29,7 @@ use Getopt::Long;
 use Pod::Text;
 use Sys::Syslog;
 use Schedule::Load::Reporter;
+use POSIX;
 use strict;
 
 BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
@@ -69,10 +70,24 @@ if (!GetOptions (
 autoflush STDOUT 1;
 autoflush STDERR 1;
 if ($opt_quiet && !$Debug) {
+    if ($opt_fork) {
+	# Fork once to let parent die
+	exit if fork();
+	# Disassociate from controlling terminal
+        POSIX::setsid();
+	# Prevent possibility of acquiring a controling terminal
+	exit if fork();
+	# Change working directory
+	chdir "/";
+    }
+    # Close open file descriptors
+    my $openmax = POSIX::sysconf( &POSIX::_SC_OPEN_MAX );
+    $openmax = (!defined($openmax) || $openmax < 0) ? 64 : $openmax;
+    foreach my $i (0 .. $openmax) { POSIX::close($i); }
     # Silence please (in case user didn't pipe when starting us)
-    open(STDOUT, "/dev/null");
-    open(STDERR, "/dev/null");
-    open(STDIN, "/dev/null");
+    open(STDIN,  "+>/dev/null");
+    open(STDOUT, "+>&STDIN");
+    open(STDERR, "+>&STDIN");
 }
 
 # Loop in case something kills us
@@ -84,16 +99,19 @@ while (1) {
 	closelog();
     }
     my $pid;
-    unless ($pid = fork) {
+    if (!$opt_fork || (0==($pid = fork()))) {
         Schedule::Load::Reporter->start (%server_params);
 	exit(0);
     }
+    die "%Error: Server aborted\n" if !$opt_fork;
+
     waitpid($pid,0);
     warn "%Warning: Server aborted\n";
     sleep(1);
     kill 9, $pid;
     sleep(1);
     # Restart this program by re-execing; allows users to restart the daemon
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
     exec $0, @Orig_ARGV if -r $0;
 }
 
@@ -113,7 +131,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -121,7 +139,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.15 2001/12/06 18:24:47 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
