@@ -102,7 +102,7 @@ Proc::ProcessTable;	(tested with 0.23)
 Unix::Processors;	(tested with 1.6)
 
 @item
-@code{cd} to the directory containing this INSTALL notice.
+@code{cd} to the directory containing this README notice.
 
 @item
 Type @samp{perl Makefile.PL} to configure Schedule::Load for your system.

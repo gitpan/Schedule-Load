@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.23 2001/02/13 17:32:59 wsnyder Exp $
+# $Id: Hosts.pm,v 1.29 2001/11/28 19:19:50 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -43,7 +43,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.5';
+$VERSION = '1.6';
 
 ######################################################################
 #### Globals
@@ -158,6 +158,26 @@ sub cpus {
     return $jobs;
 }
 
+sub idle_host_names {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
+    # Return idle hosts, potentially matching given classes
+    # Roughly scaled so even powered hosts have even representation
+
+    $self->_fetch_if_unfetched;
+    my @hnames;
+    foreach my $host (values %{$self->{hosts}}) {
+	if ($host->exists('hostname') && $host->hostname
+	    && !$host->reserved) {
+	    my $idleCpus = $host->cpus - $host->adj_load;
+	    for (my $c=0; $c<$idleCpus; $c++) {
+		push @hnames, $host->hostname;
+	    }
+	}
+    }
+    @hnames = (sort @hnames);
+    return (wantarray ? @hnames : \@hnames);
+}
+
 ######################################################################
 ######################################################################
 #### Information printing
@@ -241,6 +261,22 @@ sub print_loads {
 			   $p->uname, 		$p->time_hhmm,
 			   sprintf("%3.1f", $p->pctcpu),
 			   $comment,
+			   );
+	}
+    }
+    return $out;
+}
+
+sub print_kills {
+    my $hosts = shift;
+    # Top processes
+    my $out = "";
+    foreach my $host ( @{$hosts->hosts} ){
+	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
+			@{$host->top_processes} ) {
+	    $out.=sprintf ("ssh %s kill %s\n", 
+			   $host->hostname,
+			   $p->pid, 
 			   );
 	}
     }
@@ -463,6 +499,12 @@ parameter if true (default) restarts reporter.
 Returns the host objects, accessable with C<Schedule::Load::Hosts::Host>.
 In an array context, returns a list; In a a scalar context, returns a
 reference to a list.
+
+=item idle_host_names (...)
+
+Returns a list of host cpu names which are presently idle.  Multiple
+free CPUs on a given host will result in that name being returned multiple
+times.
 
 =item get_host ($hostname)
 

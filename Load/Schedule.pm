@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.13 2001/02/13 17:32:59 wsnyder Exp $
+# $Id: Schedule.pm,v 1.16 2001/11/28 19:19:50 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -39,7 +39,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '1.5';
+$VERSION = '1.6';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -55,6 +55,7 @@ sub new {
     return $proto->SUPER::new
 	( night_hours_cb => \&night_hours_p,
 	  favor_host => hostname(),
+	  hold_load => 1,
 	  hold_time => 60,	# secs
 	  @_);
 }
@@ -80,13 +81,18 @@ sub hosts_of_class {
 ######################################################################
 #### Functions
 
+sub reserve_default_comment {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->reserve_default_comment)';
+    return sprintf ("$self->{username} at %02d-%s %02d:%02d",
+		    localtime->mday, $MoY[localtime->mon], 
+		    localtime->hour, localtime->min),
+}
+
 sub reserve {
-    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts)';
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->reserve)';
     my $params = {
 	host=>hostname(),
-	comment=>sprintf ("$self->{username} at %02d-%s %02d:%02d",
-			  localtime->mday, $MoY[localtime->mon], 
-			  localtime->hour, localtime->min),
+	comment=>$self->reserve_default_comment(),
 	@_,};
 
     print __PACKAGE__."::reserve($params->{host}, $params->{comment})\n" if $Debug;
@@ -199,6 +205,7 @@ sub _scheduler_params {
 		      favor_host=>$self->{favor_host},
 		      hold_time=> $self->{hold_time},
 		      hold_key=>  undef,
+		      hold_load=> 1,
 		      max_jobs=>  ($is_night ? -1  : 6 ),
 		      @_ };
     # Take a ref to list of classes and add class_ and any night time options
@@ -273,11 +280,54 @@ jobs across many machines across a entire network.
 It is also a superclass of Schedule::Load::Hosts, so any functions that
 work for that module also work here.
 
+=head1 METHODS
+
 =over 4 
 
 =item best (...)
 
 Returns the hostname of the best host in the network for a new job.
+
+=item fixed_load (load=>load_value, [pid=>$$], [host=>localhost])
+
+Sets the current process and all children as always having at least the
+load value specified.  This prevents undercounting CPU utilization when a
+large batch job is running which is just paused in the short term to do
+disk IO or sleep.
+
+=item hold_release (hold_key=>key)
+
+Releases the temporary hold placed with the best function.
+
+=item hosts_of_class (class=>name)
+
+Returns C<Schedule::Load::Hosts::Host> objects for every host that matches
+the given class.
+
+=item jobs (...)
+
+Returns the maximum number of jobs suggested for the given scheduling
+parameters.  Presumably this will be used to spawn parallel jobs for one
+given user, such as the C<make -j> command.  Jobs() takes the same
+arguments as best(), in addition to the max_jobs parameter.
+
+=item release (host=>hostname)
+
+Releases the machine from exclusive use of any user.  The user doing the
+release does not have to be the same user that reserved the host.
+
+=item reserve (host=>hostname, [comment=>comment])
+
+Reserves the machine for exclusive use of the current user.  The host
+choosen must have the reservable flag set.  C<rschedule hosts> will show
+the host as reserved, along with the provided comment.
+
+=back
+
+=head1 PARAMETERS
+
+Parameters for the new and fetch calls are shown in
+C<Schedule::Load::Hosts>.
 
 =over 4
 
@@ -311,65 +361,20 @@ rases the CPU load of that choosen host.
 Number of seconds to allow the hold to remain before being removed
 automatically.
 
-=back
+=item hold_load
 
-=item fixed_load (load=>load_value, [pid=>$$], [host=>localhost])
-
-Sets the current process and all children as always having at least the
-load value specified.  This prevents undercounting CPU utilization when a
-large batch job is running which is just paused in the short term to do
-disk IO or sleep.
-
-=item hold_release (hold_key=>key)
-
-Releases the temporary hold placed with the best function.
-
-=item hosts_of_class (class=>name)
-
-Returns C<Schedule::Load::Hosts::Host> objects for every host that matches
-the given class.
-
-=item jobs (...)
-
-Returns the maximum number of jobs suggested for the given scheduling
-parameters.  Presumably this will be used to spawn parallel jobs for one
-given user, such as the C<make -j> command.  Jobs() takes the same
-arguments as best(), in addition to:
-
-=over 4
+Number of cpu loads the hold_key should reserve, defaults to one.
 
 =item max_jobs
 
 Maximum number of jobs that jobs() can return.  Defaults to 6 jobs during
 the day, unlimited at night.
 
-=back
-
-=item release (host=>hostname)
-
-Releases the machine from exclusive use of any user.  The user doing the
-release does not have to be the same user that reserved the host.
-
-=item reserve (host=>hostname, [comment=>comment])
-
-Reserves the machine for exclusive use of the current user.  The host
-choosen must have the reservable flag set.  C<rschedule hosts> will show
-the host as reserved, along with the provided comment.
-
-=back
-
-=head1 PARAMETERS
-
-Parameters for the new and fetch calls are shown in
-C<Schedule::Load::Hosts>.
-
 =item night_hours_cb
 
 Reference to Function for determining if this is night time, defaults to
 M-F 6am-10pm.  When it is nighttime hours, every class passed to the best
 option has a new class with _night appended.
-
-=over 4
 
 =back
 

@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -w
-# $Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $
+# $Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -55,7 +55,7 @@ complain();
 ######################################################################
 
 sub usage {
-    print '$Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -63,7 +63,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slpolice,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ';
+    print 'Id: $Id: slpolice,v 1.12 2001/11/05 14:34:19 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -101,7 +101,7 @@ sub gather {
 				    sprintf("%3.1f", $p->pctcpu),
 				    $p->fname);
 
-		my $succ = `rsh $mach $Nice19 $pid 2>&1`;
+		my $succ = `ssh $mach $Nice19 $pid 2>&1`;
 		print "Lowering $mach $pid $succ\n" if $Debug;
 		if ($succ !~ /%/
 		    || $opt_warn_any) {
@@ -165,7 +165,7 @@ B<slpolice>
 [ B<--help> ]
 [ B<--port=>I<port> ]
 [ B<--dhost=>I<host> ]
-[ B<--warn_any ]
+[ B<--warn_any> ]
 [ B<--version> ]
 
 =head1 DESCRIPTION

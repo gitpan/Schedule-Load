@@ -6,6 +6,19 @@ The contributors that suggested a given feature is shown in [].
 	
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
+* Changes in Schedule::Load 1.6 ***/2001
+
+**	Added slrsh command.  
+
+**	Added Schedule::Host->idle_host_names and rschedule idle_host_names.
+
+***	Hold_keys now allow hold_load, for setting the loading to other then 1.
+
+***	Use ssh in place of rsh.
+
+****	Allow optional --comment with rschedule reserve command.
+
+
 * Changes in Schedule::Load 1.5 2/13/2001
 
 ****	Documentation updates.
@@ -40,7 +53,7 @@ This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: NEWS,v 1.8 2001/02/13 17:32:55 wsnyder Exp $
+$Id: NEWS,v 1.13 2001/11/28 19:19:46 wsnyder Exp $
 ----------------------------------------------------------------------
 Copyright information:
 

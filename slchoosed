@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -Tw
-# slchoosed - choosing deamon for perl Schedule::Load
-# $Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $
+# slchoosed - choosing daemon for perl Schedule::Load
+# $Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -23,10 +23,11 @@
 
 require 5.004;
 use lib 'blib/lib';	# testing
-use English;
 use Getopt::Long;
 use Pod::Text;
 use Schedule::Load::Chooser;
+use POSIX;
+use strict;
 
 BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 
@@ -36,6 +37,8 @@ BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 ######################################################################
 # globals
 
+use vars qw(@Orig_ARGV);
+
 ######################################################################
 # main
 
@@ -44,30 +47,47 @@ BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 my $Debug = 0;
 my %server_params = ();
 my $opt_quiet = 1;
+my $opt_fork = 1;
 
-$result = &GetOptions (
-		       "help"		=> \&usage,
-		       "debug"		=> \&debug,
-		       "version"	=> \&version,
-		       "quiet!"		=> \$opt_quiet,	# Debugging
-		       "port=i"		=> sub {shift; $server_params{port} = shift;},
-		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
-		       );
-
-if (!$result) { &usage(); }
+if (!GetOptions (
+		 "help"		=> \&usage,
+		 "debug"	=> \&debug,
+		 "version"	=> \&version,
+		 "quiet!"	=> \$opt_quiet,	# Debugging
+		 "fork!"	=> \$opt_fork,	# Debugging/Test script
+		 "port=i"	=> sub {shift; $server_params{port} = shift;},
+		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		 )) {
+    &usage();
+}
 
 autoflush STDOUT 1;
 autoflush STDERR 1;
 if ($opt_quiet && !$Debug) {
+    if ($opt_fork) {
+	# Fork once to let parent die
+	exit if fork();
+	# Disassociate from controlling terminal
+        POSIX::setsid();
+	# Prevent possibility of acquiring a controling terminal
+	exit if fork();
+	# Change working directory
+	chdir "/";
+    }
+    # Close open file descriptors
+    my $openmax = POSIX::sysconf( &POSIX::_SC_OPEN_MAX );
+    $openmax = (!defined($openmax) || $openmax < 0) ? 64 : $openmax;
+    foreach my $i (0 .. $openmax) { POSIX::close($i); }
     # Silence please (in case user didn't pipe when starting us)
-    open(STDOUT, "/dev/null");
-    open(STDERR, "/dev/null");
-    open(STDIN, "/dev/null");
+    open(STDIN,  "+>/dev/null");
+    open(STDOUT, "+>&STDIN");
+    open(STDERR, "+>&STDIN");
 }
 
 # Loop in case something kills us
 while (1) {
     print "Starting server\n" if $Debug;
+    my $pid;
     unless ($pid = fork) {
         Schedule::Load::Chooser->start (%server_params,
 					restart	=> sub {},
@@ -79,7 +99,7 @@ while (1) {
     sleep(1);
     kill 9, $pid;
     sleep(1);
-    # Restart this program by re-execing; allows users to restart the deamon
+    # Restart this program by re-execing; allows users to restart the daemon
     exec $0, @Orig_ARGV if -r $0;
 }
 
@@ -88,7 +108,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -96,7 +116,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.12 2001/11/09 15:34:22 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -126,7 +146,7 @@ B<slchoosed>
 
 =head1 DESCRIPTION
 
-slchoosed will start a deamon to choose machines for the Schedule::Load
+slchoosed will start a daemon to choose machines for the Schedule::Load
 package.
 
 =head1 ARGUMENTS
@@ -140,7 +160,7 @@ Displays this message and program version and exits.
 Specifies the port number that slchoosed uses.
 
 =item --dhost
-Specifies the deamon host name that slchoosed uses.  May be specified
+Specifies the daemon host name that slchoosed uses.  May be specified
 multiple times to specify backup hosts.  Defaults to SLCHOOSED_HOST
 environment variable, which contains colon separated host names.  When
 slchoosed starts, any hosts listed AFTER the current host are assumed to be

@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.20 2001/02/13 17:32:59 wsnyder Exp $
+# $Id: Reporter.pm,v 1.22 2001/11/28 19:19:50 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -34,10 +34,13 @@ use Unix::Processors;
 use Storable qw (nstore retrieve);
 use Schedule::Load qw (:_utils);
 use Sys::Hostname;
+use Time::HiRes qw (gettimeofday);
 use Config;
 
 use strict;
-use vars qw($VERSION $Debug %User_Names %Pid_Inherit $Os_Linux);
+use vars qw($VERSION $Debug %User_Names %Pid_Inherit 
+	    @Pid_Time_Base @Pid_Time $Os_Linux
+	    $Distrust_Pctcpu);
 use Carp;
 
 ######################################################################
@@ -46,9 +49,10 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.5';
+$VERSION = '1.6';
 
 $Os_Linux = $Config{osname} =~ /linux/i;
+$Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
 
 ######################################################################
 #### Globals
@@ -237,6 +241,8 @@ sub _fill_dynamic_pid {
 	$procref->{nice0} = $procref->{nice} - 20;
     }
 
+    $procref->{time} = $p->time / 1000.0;
+
     my $state = $p->state;
     $state = "cpu".$p->onpro if ($state eq "onprocessor");
     $procref->{state} = $state;
@@ -250,6 +256,8 @@ sub _fill_dynamic_pid {
     }
 }
 
+
+
 sub _fill_dynamic {
     my $self = shift;
     # fill process and system loading values into self
@@ -259,6 +267,11 @@ sub _fill_dynamic {
 			report_load => 0,
 			total_pctcpu => 0,
 		    };
+
+    my ($sec, $usec) = gettimeofday();
+    @Pid_Time_Base = ($sec,$usec) if !defined $Pid_Time_Base[0];
+    my $deltastamp = ($sec-$Pid_Time_Base[0])*1e6 + ($usec-$Pid_Time_Base[1]);
+    @Pid_Time_Base = ($sec,$usec);
 
     # Note the $p refs cannot be cached, they change when a new table call occurs
     my $pidlist = $self->{pt}->table;
@@ -275,6 +288,27 @@ sub _fill_dynamic {
 	# See which PIDs we will log
 	my $pctcpu = $p->pctcpu || 0;
 	$pctcpu = 0 if ($pctcpu eq "inf");	# Linux
+	if ($Distrust_Pctcpu) {
+	    my $ustime = ($p->utime+$p->stime);
+	    if (!defined $Pid_Time[$p->pid]
+		|| $p->start != $Pid_Time[$p->pid][0]) {
+		# Can't calculate, as p->start is wrong (on linux).  We'll assume the
+		# pctcpu is ok.
+		#$pctcpu = $ustime / (1000*($sec-$p->start));
+		#printf "PIDSTART %d SINCESTART %d-%d=%d UTIME %d LOAD %f\n",
+		#$p->pid, $sec, $p->start, $sec-$p->start, $ustime, $pctcpu;
+	    } else {
+		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1]) * 1000)
+			       / $deltastamp / $self->{const}{cpus});
+		printf "PIDCONT %d CLOCK %d UTIME %d-%d=%d LOAD %f\n"
+		    ,$p->pid, $deltastamp,
+		    ,$ustime, $Pid_Time[$p->pid][1], $ustime-$Pid_Time[$p->pid][1],
+		    ,$pctcpu if 0;
+	    }
+	    $Pid_Time[$p->pid] = [$p->start, $ustime];
+	}
+	$pidinfo{$p->pid}{pctcpu} = $pctcpu;
+
 	my $logit = ($pctcpu >= $self->{min_pctcpu}
 		     && $p->pid != $$);	# Ignore ourself (hopefully not TOO much cpu time!)
 	$pidinfo{$p->pid}{logit} = $logit;
@@ -320,8 +354,7 @@ sub _fill_dynamic {
 
 	# Load any processes with lots of time, or with fixed_loading
 	# that isn't otherwise accounted for
-	my $pctcpu = $p->pctcpu || 0;
-	$pctcpu = 0 if ($pctcpu eq "inf");	# Linux
+	my $pctcpu = $pidinfo{$p->pid}{pctcpu};
 	if ($logit) {
 	    _fill_dynamic_pid ($self, $p, $pctcpu);
 	    $self->{dynamic}{proc}{$p->pid}{cmndcomment} = $cmndcomment if $cmndcomment;

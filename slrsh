@@ -1,0 +1,198 @@
+#!/usr/local/bin/perl -w
+# $Id: slrsh,v 1.4 2001/11/06 22:59:13 wsnyder Exp $
+################ Introduction ################
+#
+# This program is Copyright 2000 by Wilson Snyder.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of either the GNU General Public License or the
+# Perl Artistic License, with the exception that it cannot be placed
+# on a CD-ROM or similar media for commercial distribution without the
+# prior approval of the author.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# If you do not have a copy of the GNU General Public License write to
+# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
+# MA 02139, USA.
+######################################################################
+
+require 5.005;
+use IO::File;
+use Pod::Text;
+use Getopt::Long;
+use Term::ReadLine;
+use Schedule::Load::Hosts;
+use strict;
+use vars qw ($Debug @Hosts);
+
+######################################################################
+
+######################################################################
+
+my @params = ();
+
+Getopt::Long::config ("pass_through", "no_auto_abbrev");
+if (!GetOptions (
+		 "help"		=> \&usage,
+		 "debug!"	=> \$Debug,
+		 "<>"		=> \&parameter,
+		 )) {
+    &usage(); }
+push @params, @ARGV;
+
+gather();
+my $param = join(' ',@params);
+if ($param) {
+    cmd($param);
+} else {
+    cmdloop();
+}
+
+######################################################################
+
+sub parameter {
+    my $param = shift;
+    push @params, $param;
+}
+
+sub usage {
+    print '$Id: slrsh,v 1.4 2001/11/06 22:59:13 wsnyder Exp $ ', "\n";
+    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
+    pod2text($0);
+    exit(1);
+}
+
+######################################################################
+
+sub gather {
+    my @params = @_;
+
+    my $hosts = Schedule::Load::Hosts->fetch(@params);
+
+    my @hostnames = ();
+    foreach my $host ( @{$hosts->hosts} ){
+	push @hostnames, $host->hostname;
+    }
+
+    print "Hosts: @hostnames\n";
+
+    @Hosts = @hostnames;
+}
+
+######################################################################
+
+sub cmd {
+    my $cmd = shift;
+    foreach my $host (@Hosts) {
+	my @hosts = ($host);
+	@hosts = @Hosts if $cmd =~ /\@HOSTS(?![a-z0-9A-Z_])/;
+	foreach my $subhost (@hosts) {
+	    my $hcmd = $cmd;
+	    $hcmd =~ s/\@HOSTS?(?![a-z0-9A-Z_])/$subhost/mg;
+	    print "\n$host: $hcmd\n";
+	    system ("ssh",$host,$hcmd);
+	}
+    }
+}
+
+sub cmdloop {
+
+    my $Term = new Term::ReadLine 'slrsh';
+
+    while (1) {
+	my $line = $Term->readline("slrsh> ");
+	if ($line =~ /^\s*$/) {
+	} elsif ($line =~ /^\s*(hosts)\s*$/) {
+	    print "Current Hosts: @Hosts\n";
+	    my $line = $Term->readline("what_hosts? ");
+	    @Hosts = ();
+	    foreach my $h (split /(:|\s+)/, "$line:") {
+		push @Hosts, $h if $h !~ /^\s*:?\s*$/;
+	    }
+	} elsif ($line =~ /^\s*(quit|exit|q|x)\s*$/) {
+	    exit (0);
+	} else {
+	    cmd($line);
+	}
+    }
+}
+
+######################################################################
+######################################################################
+__END__
+
+=pod
+
+=head1 NAME
+
+slrsh - Perform rsh command on all clump systems
+
+=head1 SYNOPSIS
+
+B<slrsh>  I<command>
+
+B<slrsh>
+    I<command>
+    I<command>
+    ...
+    quit
+
+=head1 DESCRIPTION
+
+slrsh executes the arguments as a shell command like rsh does.  However the
+command is executed on every host registered with rschedule.  This is
+useful for system management functions.
+
+Without a argument, slrsh will prompt for commands and execute them.
+
+In any commands, @HOST is replaced with the name of the local host
+(ala `hostname`), and @HOSTS causes the command to be replicated for
+each host.  Thus this command on a 2 machine clump:
+
+    slrsh mount /net/@HOSTS
+
+will execute 4 commands:
+    ssh host1 mount /net/host1
+    ssh host1 mount /net/host2
+    ssh host2 mount /net/host1
+    ssh host2 mount /net/host2
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item --help
+
+Displays this message and program version and exits.
+
+=back
+
+=head1 SETUP
+
+ssh-keygen -t dsa
+mv .ssh/authorization_keys2 .ssh/authorized_keys2
+
+slrsh su root
+ssh -l root jamaica
+cd
+rm -rf /root/.ssh
+ln -s /usr/local/common/root/.ssh /root/.ssh
+
+=head1 SEE ALSO
+
+C<Schedule::Load>, C<rhosts>
+
+=head1 DISTRIBUTION
+
+This package is distributed via CPAN.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@wsnyder.org>
+
+=cut
+######################################################################

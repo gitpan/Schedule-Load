@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
-# slreportd - load reporting deamon for perl Schedule::Load
+# slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.10 2001/02/13 14:33:52 wsnyder Exp $
+# $Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -24,10 +24,12 @@
 
 require 5.004;
 use lib 'blib/lib';	# testing
-use English;
+use FindBin qw($Script);
 use Getopt::Long;
 use Pod::Text;
+use Sys::Syslog;
 use Schedule::Load::Reporter;
+use strict;
 
 BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 
@@ -37,6 +39,8 @@ BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 ######################################################################
 # globals
 
+use vars qw(@Orig_ARGV);
+
 ######################################################################
 # main
 
@@ -45,20 +49,22 @@ BEGIN { $ENV{PATH} = '/usr/ucb:/bin' }	# Secure path
 my $Debug = 0;
 my %server_params = ();
 my $opt_quiet = 1;
+my $opt_fork = 1;
 
 Getopt::Long::config ("pass_through", "no_auto_abbrev");
-$result = &GetOptions (
-		       "help"		=> \&usage,
-		       "debug"		=> \&debug,
-		       "version"	=> \&version,
-		       "quiet!"		=> \$opt_quiet,	# Debugging
-		       "port=i"		=> sub {shift; $server_params{port} = shift;},
-		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
-		       "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
-		       "<>"		=> \&parameter,
-		       );
-
-if (!$result) { &usage(); }
+if (!GetOptions (
+		 "help"		=> \&usage,
+		 "debug"	=> \&debug,
+		 "version"	=> \&version,
+		 "quiet!"	=> \$opt_quiet,	# Debugging
+		 "fork!"	=> \$opt_fork,	# Debugging/Test script
+		 "port=i"	=> sub {shift; $server_params{port} = shift;},
+		 "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		 "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
+		 "<>"		=> \&parameter,
+		 )) {
+    &usage();
+}
 
 autoflush STDOUT 1;
 autoflush STDERR 1;
@@ -72,6 +78,12 @@ if ($opt_quiet && !$Debug) {
 # Loop in case something kills us
 while (1) {
     print "Starting server: $0\n" if $Debug;
+    if (!$Debug) {
+	openlog($Script, 'cons,pid', 'daemon');
+	syslog('info', 'Started');
+	closelog();
+    }
+    my $pid;
     unless ($pid = fork) {
         Schedule::Load::Reporter->start (%server_params);
 	exit(0);
@@ -81,7 +93,7 @@ while (1) {
     sleep(1);
     kill 9, $pid;
     sleep(1);
-    # Restart this program by re-execing; allows users to restart the deamon
+    # Restart this program by re-execing; allows users to restart the daemon
     exec $0, @Orig_ARGV if -r $0;
 }
 
@@ -101,7 +113,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -109,7 +121,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.10 2001/02/13 14:33:52 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.13 2001/11/28 19:19:46 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -138,7 +150,7 @@ B<slreportd>
 
 =head1 DESCRIPTION
 
-slreportd will start a deamon to report machine loading for the
+slreportd will start a daemon to report machine loading for the
 Schedule::Load package.
 
 =head1 ARGUMENTS
@@ -152,7 +164,7 @@ Displays this message and program version and exits.
 Specifies the port number that slchoosed uses.
 
 =item --dhost
-Specifies the deamon host name that slchoosed uses.  May be specified
+Specifies the daemon host name that slchoosed uses.  May be specified
 multiple times to specify backup hosts.  Defaults to SLCHOOSED_HOST
 environment variable, which contains colon separated host names.
 

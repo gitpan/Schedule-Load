@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.21 2001/02/13 17:32:59 wsnyder Exp $
+# $Id: Chooser.pm,v 1.23 2001/11/28 19:19:50 wsnyder Exp $
 ######################################################################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -49,7 +49,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '1.5';
+$VERSION = '1.6';
 
 ######################################################################
 #### Globals
@@ -555,6 +555,7 @@ sub _schedule {
 	$Holds{$schparams->{hold_key}} = {
 	    hostname=>$bestref->hostname,
 	    expires=>($Time + $schparams->{hold_time}),
+	    hold_load=>($schparams->{hold_load}||1),
 	};
 	_hold_adjust ($bestref);
     }
@@ -601,7 +602,9 @@ sub _hold_adjust {
     my $hostname = $host->hostname;
     my $adj = $host->{dynamic}{report_load};
     foreach my $holdkey (keys %Holds) {
-	$adj ++ if $Holds{$holdkey}{hostname} eq $hostname;
+	if ($Holds{$holdkey}{hostname} eq $hostname) {
+	    $adj += $Holds{$holdkey}{hold_load};
+	}
     }
     $host->{dynamic}{adj_load} = $adj;
 }

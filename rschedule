@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $
+# $Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $
 ################ Introduction ################
 #
 # This program is Copyright 2000 by Wilson Snyder.
@@ -47,6 +47,7 @@ my @commands = ();
 my $opt_fixed_load = 1;	# For fixedload
 my @opt_classes = ();
 my $opt_comment;
+my $opt_kill;
 my $opt_host = hostname();
 
 if ($0 =~ /(^|[\\\/])rtop$/) {
@@ -72,6 +73,7 @@ $result = &GetOptions (
 		       "class=s"	=> \@opt_classes,
 		       "load=i"		=> \$opt_fixed_load,
 		       "comment=s"	=> \$opt_comment,
+		       "kill!"		=> \$opt_kill,
 		       "<>"		=> \&cmd,
 		       );
 
@@ -128,8 +130,16 @@ sub cmd {
 	push @commands, sub { print $scheduler->print_top; };
     } elsif ($param eq "hosts") {
 	push @commands, sub { print $scheduler->print_hosts; };
+    } elsif ($param eq "idle_host_names") {
+	push @commands, sub { print join(' ',$scheduler->idle_host_names),"\n"; };
+    } elsif ($param eq "jobs") {
+	push @commands, sub { print $scheduler->jobs,"\n"; };
     } elsif ($param eq "loads") {
-	push @commands, sub { print $scheduler->print_loads; };
+	if ($opt_kill) {
+	    push @commands, sub { print $scheduler->print_kills; };
+	} else {
+	    push @commands, sub { print $scheduler->print_loads; };
+	}
     } elsif ($param eq "classes") {
 	push @commands, sub { print $scheduler->print_classes; };
     } elsif ($param eq "restart") {	# Undocumented as is nasty
@@ -143,7 +153,14 @@ sub cmd {
     }
     elsif ($param eq "reserve") {
 	push @commands, sub {
-	    $scheduler->reserve (host=>$opt_host); 
+	    my @param = ();
+	    if (defined $opt_comment) {
+		if ($opt_comment !~ s/^-//) {
+		    $opt_comment = $scheduler->reserve_default_comment . "; " . $opt_comment;
+		}
+		push @param, (comment=>$opt_comment); 
+	    }
+	    $scheduler->reserve (host=>$opt_host, @param); 
 	}
     } elsif ($param eq "release") {
 	push @commands, sub {
@@ -183,7 +200,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $ ', "\n";
+    print '$Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -191,7 +208,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.17 2001/02/13 14:33:52 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule,v 1.21 2001/11/28 19:19:46 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -262,43 +279,9 @@ will show the load report.
 
 =over 4
 
-=item classes
-
-Displays a listing of the classes of jobs each host can run.
-
-=item hosts
-
-Displays a listing of each host being monitored along with its
-load and system type.
-
-=item loads
-
-Displays a longer command line of top jobs, along with any fixed_load
-jobs.
-
-=item top
-
-Displays a listing of top processes across all hosts being monitored.
-
 =item allow_class hostname class
 
 Sets the hostname to allow the specified class of jobs.
-
-=item deny_class hostname
-
-Sets the hostname to deny the specified class of jobs.
-
-=item reserve
-
-Reserves a host for dedicated use.  To be reservable the C<reservable> flag
-must be set when that host's C<slreportd> is invocated.  This is indicated
-on the top report by a "R" in the column next to the command.  To override
-a existing reservation you need to release the reservation first.
-Use --host to specify whish host.
-
-=item release
-
-Releases a host from dedicated use.  Use --host to specify whish host.
 
 =item best
 
@@ -308,17 +291,57 @@ Returns the best host for a new job.
 
 Returns the best host if there are free CPUs laying around, else fails.
 
-=item fixed_load pid
+=item classes
 
-Sets the given process ID to have that process count as one host load, even
-if it is using less CPU time then that due to high disk activity or other
-sleeps.
+Displays a listing of the classes of jobs each host can run.
 
 =item cmnd_comment pid
 
 Sets the command comment for the given process ID.  In rschedule top (rtop)
 displays, this will be shown rather then the name of the command.  Command
 comments are inherited by children of commented parents.
+
+=item deny_class hostname
+
+Sets the hostname to deny the specified class of jobs.
+
+=item fixed_load pid
+
+Sets the given process ID to have that process count as one host load, even
+if it is using less CPU time then that due to high disk activity or other
+sleeps.
+
+=item hosts
+
+Displays a listing of each host being monitored along with its
+load and system type.
+
+=item idle_host_names
+
+Displays list of each idle cpu.  Multi-cpu hosts appear multiple times.
+
+=item loads
+
+Displays a longer command line of top jobs, along with any fixed_load
+jobs.
+
+=item release
+
+Releases a host from dedicated use.  Use --host to specify whish host.
+
+=item reserve
+
+Reserves a host for dedicated use.  To be reservable the C<reservable> flag
+must be set when that host's C<slreportd> is invocated.  This is indicated
+on the top report by a "R" in the column next to the command.  To override
+a existing reservation you need to release the reservation first.  Use
+--host to specify whish host.  A optional --comment specifies the
+reservation comment; the default time and user will be prepended unless a
+leading - is used.
+
+=item top
+
+Displays a listing of top processes across all hosts being monitored.
 
 =back
 

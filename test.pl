@@ -1,4 +1,4 @@
-#$Id: test.pl,v 1.14 2001/02/09 19:11:25 wsnyder Exp $
+#$Id: test.pl,v 1.17 2001/11/09 15:34:22 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -7,6 +7,9 @@
 
 use Sys::Hostname;
 use IO::Socket;
+use Test;
+
+BEGIN { plan tests => 3 }
 
 $SIG{INT} = \&cleanup_and_exit;
 #$Debug = 1;
@@ -18,7 +21,7 @@ BEGIN { $| = 1; print "1..12\n";
 	print "****NOTE****: You need 'slchoosed &' and 'slreportd &' running for this test!\n";
 	print "** I'm starting them under a subprocess\n";
     }
-END {print "not ok 1\n" unless $loaded;}
+ok(1);
 
 BEGIN {
     (eval 'use Proc::ProcessTable;1;') or die "not ok 1: %Error: You must install Proc::ProcessTable!\n";
@@ -27,7 +30,7 @@ BEGIN {
 
 use Schedule::Load::Schedule;
 $loaded = 1;
-print "ok 1\n";
+ok(1);
 
 if ($Schedule::Load::_Default_Params{port} =~ /^\d$/) {
     print "%Note: You do not have slchoosed in /etc/services, may want to add\nslchoosed\t1752/tcp\t\t\t# Schedule::Load\n\n";
@@ -58,7 +61,7 @@ mkdir ('test_store', 0777);
 if (1) {
     start_server ("./slchoosed");
     sleep 1;
-    start_server ("./slreportd class_verilog=1 reservable=1 --stored_filename=./test_store/".hostname());
+    start_server ("./slreportd class_verilog=1 reservable=1 --nofork --stored_filename=./test_store/".hostname());
     check_server_up(8);  # 2*(4 children: perl, sh, daemon master, daemon slave)
     sleep 5;
 }
@@ -66,38 +69,38 @@ if (1) {
 ############
 
 # 2: Constructor
-print (($scheduler = new Schedule::Load::Schedule
-	( %Invoke_Params,
-	  print_down=>sub { die "%Error: Can't locate sch server\n"
-				. "\tRun 'slchoosed &' before this test\n";
-			}
-	  )) ? "ok 2\n" : "not ok 2\n");
+my $scheduler = new Schedule::Load::Schedule
+    ( %Invoke_Params,
+      print_down=>sub { die "%Error: Can't locate sch server\n"
+			    . "\tRun 'slchoosed &' before this test\n";
+		    }
+      );
+ok ($scheduler);
 
-# 3: Machines
-print (($scheduler->print_hosts
-	) ? "ok 3\n" : "not ok 3\n");
+print "print_hosts check\n";
+ok ($scheduler->print_hosts);
 
-# 4: Classes
-print (($scheduler->print_classes
-	) ? "ok 4\n" : "not ok 4\n");
+print "print_classes check\n";
+ok ($scheduler->print_classes);
 
 # 5: Top processes
-print (($scheduler->print_top
-	) ? "ok 5\n" : "not ok 5\n");
+ok ($scheduler->print_top);
 
 # 6: Cpus
+print "cpus check\n";
 my $cpus = $scheduler->cpus;
 print "Total cpus in network: $cpus\n";
-print (($cpus>0) ? "ok 6\n\n" : "not ok 6\n\n");
+ok ($cpus>0);
 
 # 7: Choose host, get this one
 my @classes = $scheduler->classes();
 #testclass (@classes);
 testclass (['verilog']);
-print ((1) ? "ok 7\n\n" : "not ok 7\n\n");
+ok(1);
 
 # 8: Check holds
-print (check_load() ? "ok 8\n\n" : "not ok 8\n\n");
+print "loads check\n";
+ok(check_load());
 
 # 9: Release holds
 foreach (keys %Hold_Keys) {
@@ -106,15 +109,15 @@ foreach (keys %Hold_Keys) {
     $Host_Load{$host}--;
     delete $Hold_Keys{$_};
 }
-print "ok 9\n\n";
+ok(1);
 
 # 10: Fixed loading
 $scheduler->fixed_load (load=>10, pid=>$$);
 $Host_Load{hostname()} += 10;
-print "ok 10\n\n";
+ok(1);
 
 # 11: Retrieve loading...
-check_load() ? "ok 11\n\n" : "not ok 11\n\n";
+ok(check_load());
 
 # Establish reservation
 $scheduler->reserve();
@@ -127,12 +130,12 @@ $scheduler->cmnd_comment (pid=>$$, comment=>"test.pl_comment_check");
 $scheduler->fetch;
 print $scheduler->print_top() if $Debug;
 # No way to insure our job is on top, so can't test it
-#print (($scheduler->print_top() =~ /_comment_check/)
-print ((1) ? "ok 12\n\n" : "not ok 12\n\n");
+#ok($scheduler->print_top() =~ /_comment_check/);
+ok(1);
 
 ## 99: Destructor
 undef $scheduler;
-print "\nok 99\n";
+ok(1);
 
 print "\nYou would be well advised to look for and kill any\n";
 print "slreportd jobs that are running on --port $Port\n";
@@ -230,10 +233,14 @@ sub check_server_up {
     my $children = shift;
     # Are the servers up?  Look for the specific number of children to be running
     my $try = 60;
+    print "Checking for $children server children\n";
     while ($try--) {
 	my @children = Schedule::Load::_subprocesses();
-	print "@children\n" if $Debug;
-	return if ($#children == $children-1);
+	print "@children\n" if $Debug||1;
+	if ($#children == $children-1) {
+	    print "  Found\n";
+	    return;
+	}
 	sleep 1;
     }
     die "%Error: Children never started correctly,\nplease try running the daemons in the foreground\n";
@@ -246,7 +253,8 @@ sub cleanup_and_exit {
     # END routine to kill children
     foreach my $pid (keys %pids) {
 	next if !$pid;
-	foreach (Schedule::Load::_subprocesses($pid)) {
+	my @proc = Schedule::Load::_subprocesses($pid);
+	foreach (@proc) {
 	    kill 9, $_;  print "  Killing $_ (child of $pid)\n";
 	}
 	kill 9, $pid;  print "  Killing $pid (started it earlier)\n";
@@ -262,6 +270,7 @@ sub start_server {
 
     my $cmd = "$prog --port $Invoke_Params{port} --dhost $Invoke_Params{dhost}";
     $cmd .= " --debug" if $Debug;
+    $cmd .= " --nofork";  # Need children under this parent so can kill them
     $cmd .= " && perl -e '<STDIN>'";
 
     $pid = fork();
