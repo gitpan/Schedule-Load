@@ -1,0 +1,122 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename readme.info
+@settitle Perl Schedule::Load Installation
+@c %**end of header
+
+@c This file is included by autoconf.texi and is used to produce
+@c the INSTALL file.
+
+@node Top, Copyright, (dir), (dir)
+
+This is the Schedule::Load Perl Package.
+
+@menu
+* Copyright::                   
+* Description::                 
+* Obtaining Distribution::      
+* Supported Systems::           
+* Installation::                
+@end menu
+
+@node Copyright, Description, Top, Top
+@section Copyright
+
+This package is Copyright 2000 by Wilson Snyder @email{wsnyder@@world.std.com}.
+
+You may distribute under the terms of either the GNU General Public License
+or the Artistic License, as specified in the Perl README file, with the
+exception that it cannot be placed on a CD-ROM or similar media for commercial
+distribution without the prior approval of the author.
+
+This code is provided with no warranty of any kind, and is used entirely at
+your own risk.
+
+@node Description, Obtaining Distribution, Copyright, Top
+@section Description
+
+This package allows accessing loading and top job status across many
+machines on a network, comprising a server farm.  It also allows for
+scheduling new jobs on the best machine across the entire network.
+
+For example:
+
+@example
+  rtop
+
+HOST         CPUs FREQ TotCPU%  LOAD  RATE RL ARCH/OS
+alpha           8  400   27.9%     2 17.12    sun4-solaris 2.6
+omega           1  333    0.2%     1   inf R1 Reserved: qzurns at 17-Jan 10:29
+beta            6  248   69.4%     5 19.46    sun4-solaris 2.6
+
+HOST            PID USER     NICE    MEM STATE  RUNTM   CPU% COMMAND
+beta           4678 qmullens    0    34M cpu1    3:04  12.4% vt urx/urx_cell_ms
+alpha          4047 charlieg   19   147M cpu9   16:44  12.4% dc_shell ccr_iorg
+
+  rschedule best
+Best host is 'alpha'
+
+@end example
+
+Perl functions provide object oriented access to all of this information
+and more.
+
+Also included is a program to warn of jobs with over two hours of CPU
+time, renice them to 19 and send mail to the offending user.
+
+See @samp{man Schedule::Load} after installation.
+
+@node Obtaining Distribution, Supported Systems, Description, Top
+@section Obtaining Distribution
+
+The latest version is available at 
+@uref{http://www.perl.org/CPAN/}
+
+Download the latest package from that site, and decompress.
+@samp{gunzip Schedule::Load_version.tar.gz ; tar xvf Schedule::Load_version.tar}
+
+@node Supported Systems, Installation, Obtaining Distribution, Top
+@section Supported Systems
+
+This version of Schedule::Load has been built and tested on:
+
+@itemize @bullet
+@item sparc-sun-solaris2.5.1
+@item i386-linux
+@end itemize
+
+It should run on any Unix system with perl and TCP/IP socketing,
+provided that the required perl modules below are ported to the
+platform.
+
+@node Installation,  , Supported Systems, Top
+@section Installation
+
+@enumerate
+@item
+Before installing this module, you need the following modules available
+from CPAN:
+
+Storable		(tested with 0.6.5)
+Proc::ProcessTable;	(tested with 0.23)
+Unix::Processors;	(tested with 1.6)
+
+@item
+@code{cd} to the directory containing this INSTALL notice.
+
+@item
+Type @samp{perl Makefile.PL} to configure Schedule::Load for your system.
+
+@item
+Type @samp{make} to compile Schedule::Load.
+
+@item
+Type @samp{make test} to check the compilation.
+
+@item
+Type @samp{make install} to install the programs and any data files and
+documentation.
+
+@end enumerate
+
+

@@ -1,0 +1,369 @@
+#!/usr/local/bin/perl -w
+# rschedule - User interface to perl Schedule::Load
+# $Id: rschedule,v 1.13 2000/01/18 00:18:37 wsnyder Exp $
+################ Introduction ################
+#
+# This program is Copyright 2000 by Wilson Snyder.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# If you do not have a copy of the GNU General Public License write to
+# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
+# MA 02139, USA.
+
+require 5.004;
+BEGIN { $ENV{SLCHOOSED_HOST} ||= "tomcat:mondo"; } #FIX
+use lib 'blib/lib';	# testing
+use English;
+use Getopt::Long;
+use Sys::Hostname;
+use Pod::Text;
+use Schedule::Load;
+use Schedule::Load::Schedule;
+
+######################################################################
+# configuration
+
+
+######################################################################
+# globals
+
+######################################################################
+# main
+
+$Debug = 0;
+my %server_params = ();
+my @commands = ();
+my $opt_fixed_load = 1;	# For fixedload
+my @opt_classes = ();
+my $opt_comment;
+my $opt_host = hostname();
+
+if ($0 =~ /(^|[\\\/])rtop$/) {
+    # Special program name, force defaults
+    push @ARGV, ("hosts", "top");
+}
+if ($0 =~ /(^|[\\\/])rhosts$/) {
+    # Special program name, force defaults
+    push @ARGV, ("hosts");
+}
+if ($0 =~ /(^|[\\\/])rloads$/) {
+    # Special program name, force defaults
+    push @ARGV, ("loads");
+}
+
+$result = &GetOptions (
+		       "help"		=> \&usage,
+		       "debug"		=> \&debug,
+		       "version"	=> \&version,
+		       "port=i"		=> sub {shift; $server_params{port} = shift;},
+		       "dhost=s"	=> sub {shift; push @{$server_params{dhost}}, shift;},
+		       "host=s"		=> \$opt_host,
+		       "class=s"	=> \@opt_classes,
+		       "load=i"		=> \$opt_fixed_load,
+		       "comment=s"	=> \$opt_comment,
+		       "<>"		=> \&cmd,
+		       );
+
+if (!$result) { &usage(); }
+
+# Fetch just once for speed
+$scheduler = Schedule::Load::Schedule->fetch(%server_params);
+my $secondcmd = 0;
+foreach (@commands) {
+    print "\n" if $secondcmd++;
+    &$_;
+}
+
+exit (0);
+
+######################################################################
+
+BEGIN {#static
+my $Last_Cmd = "";
+my $Opt_Value = 0;
+sub cmd {
+    my $param = shift;
+
+    # Options to a command just specified
+    if ($Last_Cmd eq "class") {
+	$Last_Cmd = "";
+	push @commands, sub {
+	    my $class = "class_$param" if $param !~ /^class_/;
+	    $scheduler->set_stored (host=>$opt_host,
+				    $class =>$Opt_Value, );
+        };
+    } 
+    elsif ($Last_Cmd eq "fixed_load") {
+	$Last_Cmd = "";
+	push @commands, sub {
+	    ($param =~ /^\d+$/) or die "%Error: Fixed_load requires PID argument\n";
+	    $scheduler->fixed_load (host=>$opt_host,
+				    load=>$opt_fixed_load,
+				    pid=>$param);
+	};
+    }
+    elsif ($Last_Cmd eq "cmnd_comment") {
+	$Last_Cmd = "";
+	push @commands, sub {
+	    ($param =~ /^\d+$/) or die "%Error: Cmnd_comment requires PID argument\n";
+	    ($opt_comment) or die "%Error: Cmnd_comment requires --comment setting\n";
+	    $scheduler->cmnd_comment (host=>$opt_host,
+				      comment=>$opt_comment,
+				      pid=>$param);
+	};
+    }
+    # New command options
+    elsif ($param eq "top") {
+	push @commands, sub { print $scheduler->print_top; };
+    } elsif ($param eq "hosts") {
+	push @commands, sub { print $scheduler->print_hosts; };
+    } elsif ($param eq "loads") {
+	push @commands, sub { print $scheduler->print_loads; };
+    } elsif ($param eq "classes") {
+	push @commands, sub { print $scheduler->print_classes; };
+    } elsif ($param eq "restart") {	# Undocumented as is nasty
+	push @commands, sub { $scheduler->restart; };
+    } elsif ($param eq "restart_chooser") {	# Undocumented as is nasty
+	push @commands, sub { $scheduler->restart (reporter=>0); };
+    } elsif ($param eq "restart_reporter") {	# Undocumented as is nasty
+	push @commands, sub { $scheduler->restart (chooser=>0); };
+    } elsif ($param eq "_chooser_close_all") {	# Undocumented, for debugging
+	push @commands, sub { $scheduler->_chooser_close_all(); };
+    }
+    elsif ($param eq "reserve") {
+	push @commands, sub {
+	    $scheduler->reserve (host=>$opt_host); 
+	}
+    } elsif ($param eq "release") {
+	push @commands, sub {
+	    $scheduler->release (host=>$opt_host); 
+	}
+    } elsif ($param eq "allow_class") {
+	$Last_Cmd = "class";
+	$Opt_Value = 1;
+    } elsif ($param eq "deny_class") {
+	$Last_Cmd = "class";
+	$Opt_Value = 0;
+    } elsif ($param eq "fixed_load") {
+	$Last_Cmd = "fixed_load";
+    } elsif ($param eq "cmnd_comment") {
+	$Last_Cmd = "cmnd_comment";
+    } elsif ($param eq "best") {
+	push @commands, sub {
+	    my $val = $scheduler->best(classes=>\@opt_classes, );
+	    print "$val\n" if (defined $val);
+	    die "%Error: No best host found\n" if (!defined $val);
+	};
+    } elsif ($param eq "best_or_none") {
+	push @commands, sub {
+	    my $val = $scheduler->best(classes=>\@opt_classes, allow_none=>1,);
+	    print "$val\n" if (defined $val);
+	    die "%Error: No host as low enough loading\n" if (!defined $val);
+	};
+    } else {
+	die "%Error: Unknown command option $param\n";
+    }
+}
+END {
+    if ($Last_Cmd) { die "%Error: Command $Last_Cmd needs another argument\n"; }
+}
+}#static
+
+######################################################################
+
+sub usage {
+    print '$Id: rschedule,v 1.13 2000/01/18 00:18:37 wsnyder Exp $ ', "\n";
+    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
+    pod2text($0);
+    exit(1);
+}
+
+sub version {
+    print 'Version: $Id: rschedule,v 1.13 2000/01/18 00:18:37 wsnyder Exp $ ';
+    print "\n";
+    exit (1);
+}
+
+sub debug {
+    $Debug = 1;
+    $Schedule::Load::Debug = $Debug;
+    $Schedule::Load::Schedule::Debug = $Debug;
+    $Schedule::Load::Hosts::Debug = $Debug;
+}
+
+######################################################################
+######################################################################
+######################################################################
+
+######################################################################
+######################################################################
+__END__
+
+=pod
+
+=head1 NAME
+
+rschedule - User interface for perl Schedule::Load configuration and status
+
+=head1 SYNOPSIS
+
+B<rschedule>
+[ B<--help> ]
+[ B<--port=>I<port> ]
+[ B<--dhost=>I<host> ]
+[ B<--version> ]
+
+B<rschedule> B<top>
+B<rtop>
+
+B<rschedule> B<hosts>
+B<rhosts>
+
+B<rschedule> B<loads>
+B<rloads>
+
+B<rschedule> [ B<--host=>I<host> B<--override>] B<reserve>
+
+B<rschedule> [ B<--host=>I<host> ] B<release>
+
+B<rschedule> [ B<--host=>I<host> ] B<allow_class> B<class>
+
+B<rschedule> [ B<--host=>I<host> ] B<deny_class> B<class>
+
+B<rschedule> B<--class=>I<class> B<best>
+
+B<rschedule> B<--class=>I<class> B<best_or_none>
+
+B<rschedule> [ B<--load=>I<load> ] B<fixed_load> B<pid>
+
+=head1 DESCRIPTION
+
+rschedule will report or set status for load distribution using the
+perl Schedule::Load package.
+
+If symbolically linked to the name "rtop" rschedule will by default produce
+a listing of each host and the top loads on those hosts.  Similarly, a link
+to "rhosts" will show the host report by default, and a link to "rloads"
+will show the load report.
+
+=head1 COMMANDS
+
+=over 4
+
+=item classes
+
+Displays a listing of the classes of jobs each host can run.
+
+=item hosts
+
+Displays a listing of each host being monitored along with its
+load and system type.
+
+=item loads
+
+Displays a longer command line of top jobs, along with any fixed_load
+jobs.
+
+=item top
+
+Displays a listing of top processes across all hosts being monitored.
+
+=item allow_class hostname class
+
+Sets the hostname to allow the specified class of jobs.
+
+=item deny_class hostname
+
+Sets the hostname to deny the specified class of jobs.
+
+=item reserve hostname
+
+Reserves a host for dedicated use.  To be reservable the C<reservable> flag
+must be set when that host's C<slreportd> is invocated.  This is indicated
+on the top report by a "R" in the column next to the command.  To override
+a existing reservation you need to release the reservation first.
+
+=item release hostname
+
+Releases a host from dedicated use.
+
+=item best
+
+Returns the best host for a new job.
+
+=item best_or_none
+
+Returns the best host if there are free CPUs laying around, else fails.
+
+=item fixed_load pid
+
+Sets the given process ID to have that process count as one host load, even
+if it is using less CPU time then that due to high disk activity or other
+sleeps.
+
+=item cmnd_comment pid
+
+Sets the command comment for the given process ID.  In rschedule top (rtop)
+displays, this will be shown rather then the name of the command.  Command
+comments are inherited by children of commented parents.
+
+=back
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item --help
+
+Displays this message and program version and exits.
+
+=item --port <portnumber>
+
+Specifies the port number that slchoosed uses.
+
+=item --dhost <hostname>
+
+Specifies the host name that slchoosed uses.  May be specified multiple
+times to specify backup hosts.  Defaults to SLCHOOSED_HOST environment
+variable, which contains colon separated host names.
+
+=item --load <load>
+
+Specifies the load value for the fixed_load command, defaults to 1.
+
+=item --comment <comment>
+
+Specifies the command comment for the cmnd_comment command.
+
+=item --class <class>
+
+Specifies the job class for the best command.
+
+=item --version
+
+Displays program version and exits.
+
+=back
+
+=head1 SEE ALSO
+
+C<Schedule::Load>
+
+=head1 DISTRIBUTION
+
+This package is distributed via CPAN.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@world.std.com>
+
+=cut
+######################################################################

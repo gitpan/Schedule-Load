@@ -1,0 +1,236 @@
+#!/usr/local/bin/perl -w
+# $Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $
+################ Introduction ################
+#
+# This program is Copyright 2000 by Wilson Snyder.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# If you do not have a copy of the GNU General Public License write to
+# the Free Software Foundation, Inc., 675 Mass Ave, Cambridge, 
+# MA 02139, USA.
+
+require 5.005;
+use IO::File;
+use Pod::Text;
+use Getopt::Long;
+use Schedule::Load::Hosts;
+use English;
+
+######################################################################
+
+$First_Complaint = 1;	# Time for first warning (hours)
+$Daily_Complaint = 4;	# Time for daily warning (hours)
+$Nice19 = "renice19 -only_if_at";
+$Sendmail = "/usr/lib/sendmail";
+
+######################################################################
+
+$Debug = 0;
+$opt_warn_any = 0;
+%opt_server_params = ();
+$result = &GetOptions (
+		       "help"		=> \&usage,
+		       "debug!"		=> \$Debug,
+		       "version"	=> \&version,
+		       "warn_any!"	=> \$opt_warn_any,
+		       "port=i"		=> sub {shift; $opt_server_params{port} = shift;},
+		       "dhost=s"	=> sub {shift; push @{$opt_server_params{dhost}}, shift;},
+		       );
+if (!$result) { &usage(); }
+
+gather(%opt_server_params);
+complain();
+
+######################################################################
+
+sub usage {
+    print '$Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $ ', "\n";
+    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
+    pod2text($0);
+    exit(1);
+}
+
+sub version {
+    print 'Version: $Id: slpolice,v 1.6 2000/01/17 17:49:32 wsnyder Exp $ ';
+    print "\n";
+    exit (1);
+}
+
+######################################################################
+
+sub gather {
+    my @params = @_;
+
+    my $hosts = Schedule::Load::Hosts->fetch(@params);
+
+    (my $FORMAT =           "%-12s   %6s    %-8s     %4s    %6s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    foreach my $host ( @{$hosts->hosts} ){
+	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
+			@{$host->top_processes} ) {
+	    my $mach = $host->hostname;
+	    my $name = $p->uname;
+	    #print "ck $line\n";
+	    next if !$p->time;
+	    next if $name eq "root";
+	    my $pid = $p->pid;
+	    my $hr = 0;
+	    $hr = $p->time/60.0/60.0;
+	    $hr = 0  if ($Debug);
+	    $hr = 99 if ($Debug && $p->uid eq $UID);  # Test... Every one of runner's violates
+	    print "Hr $hr  Name $name   Pid $pid\n" if $Debug;
+	    if (($hr >= ($opt_warn_any ? $Daily_Complaint
+			 : $First_Complaint))) {
+		my $line = sprintf ($FORMAT, 
+				    $host->hostname,
+				    $p->pid, 
+				    $p->uname,		$p->nice0, 
+				    int(($p->size||0)/1024/1024)."M",
+				    $p->state, 		$p->time_hhmm,
+				    sprintf("%3.1f", $p->pctcpu),
+				    $p->fname);
+
+		my $succ = `rsh $mach $Nice19 $pid 2>&1`;
+		print "Lowering $mach $pid $succ\n" if $Debug;
+		if ($succ !~ /%/
+		    || $opt_warn_any) {
+		    my $subj = sprintf "Process %5d on $mach", $pid;
+		    $Complaints{$name}{$subj} = $line;
+		    $Lowered{$name}{$subj} = ($succ !~ /%/);
+		}
+	    }
+	}
+    }
+}
+
+sub complain {
+    for my $to (sort (keys %Complaints)) {
+	my $subj = undef;
+	my $body = "";
+	my $lowered = 0;
+	for my $proc (sort (keys %{$Complaints{$to}})) {
+	    $subj = $proc if (!defined $subj);
+	    $body .= $Complaints{$to}{$proc};
+	    $lowered ||= $Lowered{$to}{$proc};
+	}
+	print "To: $to\nSubject: $subj\n$body\n" if $Debug;
+
+	my $cmd = "$Sendmail -F 'CPU Policeman' -f root $to";
+	$fh = IO::File->new("|$cmd") or die "%Error: $! $cmd";
+	print $fh "To: $to\n";
+	print $fh "From: CPU Policeman <root>\n";
+	print $fh "Subject: CPU Police: $subj\n";
+	print $fh "\n";
+	print $fh "You have the following processes which have run\n";
+	print $fh "for quite a while.  Perhaps they need killing?\n";
+	if ($lowered) {
+	    print $fh "\n";
+	    print $fh "In the meantime, I've reniced 19 them.\n";
+	    print $fh "Use 'renice10 {pid}' now or preemptively to prevent this.\n";
+	}
+	print $fh "\n";
+	print $fh "To see latest status, use:  rtop\n";
+	print $fh "To kill, use:    rsh {machine} kill     {pid}\n";
+	print $fh "To renice, use:  rsh {machine} renice10 {pid}\n";
+	print $fh "\n";
+	print $fh "$body\n";
+	$fh->close;
+    }
+}
+
+######################################################################
+######################################################################
+__END__
+
+=pod
+
+=head1 NAME
+
+slpolice - Warn and renice top cpu hogs
+
+=head1 SYNOPSIS
+
+B<slpolice>
+[ B<--help> ]
+[ B<--port=>I<port> ]
+[ B<--dhost=>I<host> ]
+[ B<--warn_any ]
+[ B<--version> ]
+
+=head1 DESCRIPTION
+
+slpolice will determine the top cpu users across a cluster of hosts.
+It will send mail if a process has over 1 hour of cpu time, and if the
+nice value of that process is not 10, renice the process to 19.
+
+Mail is sent to the user who is reniced.  Mail is also sent if --warn_any
+is used and the CPU limit is exceeded, even if the nice value is 10.
+
+Usually slpolice is run with a crontab entry similar to:
+
+    5 7 * * * /usr/local/bin/slpolice --warn_any >/dev/null 2>&1
+    5 8-21 * * * /usr/local/bin/slpolice >/dev/null 2>&1
+
+This sends warnings the first hour that a process violates, and reminders
+every day at 7 am.  It does not check at night so that long overnight jobs
+will not receive warnings.
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item --help
+
+Displays this message and program version and exits.
+
+=item --port <portnumber>
+
+Specifies the port number that slchoosed uses.
+
+=item --dhost <hostname>
+
+Specifies the host name that slchoosed uses.  May be specified multiple
+times to specify backup hosts.  Defaults to SLCHOOSED_HOST environment
+variable, which contains colon separated host names.
+
+=item --warn_any
+
+Specifies that any jobs with over a hour should produce a warning, even
+if the job is already niced.
+
+=item --version
+
+Displays program version and exits.
+
+=back
+
+=head1 SEE ALSO
+
+C<nicercizerd>, 
+C<Schedule::Load>
+
+This program is most valuable when used with the C<nicercizerd> program, or
+a operating system where nice 19 processes get only leftover cpu resources.
+It requires a program called C<nice19> which is a version of nice that is
+setgid root and renices a job to 19.  This comes with C<nicercizerd>.
+
+=head1 DISTRIBUTION
+
+This package is distributed via CPAN.
+
+C<Nicercizerd> is available from
+C<http://www.ultranet.com/~wsnyder/veripool>.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@world.std.com>
+
+=cut
+######################################################################

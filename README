@@ -1,0 +1,92 @@
+This is the Schedule::Load Perl Package.
+
+Copyright
+=========
+
+   This package is Copyright 2000 by Wilson Snyder
+<wsnyder@world.std.com>.
+
+   You may distribute under the terms of either the GNU General Public
+License or the Artistic License, as specified in the Perl README file,
+with the exception that it cannot be placed on a CD-ROM or similar
+media for commercial distribution without the prior approval of the
+author.
+
+   This code is provided with no warranty of any kind, and is used
+entirely at your own risk.
+
+Description
+===========
+
+   This package allows accessing loading and top job status across many
+machines on a network, comprising a server farm.  It also allows for
+scheduling new jobs on the best machine across the entire network.
+
+   For example:
+
+       rtop
+     
+     HOST         CPUs FREQ TotCPU%  LOAD  RATE RL ARCH/OS
+     alpha           8  400   27.9%     2 17.12    sun4-solaris 2.6
+     omega           1  333    0.2%     1   inf R1 Reserved: qzurns at 17-Jan 10:29
+     beta            6  248   69.4%     5 19.46    sun4-solaris 2.6
+     
+     HOST            PID USER     NICE    MEM STATE  RUNTM   CPU% COMMAND
+     beta           4678 qmullens    0    34M cpu1    3:04  12.4% vt urx/urx_cell_ms
+     alpha          4047 charlieg   19   147M cpu9   16:44  12.4% dc_shell ccr_iorg
+     
+       rschedule best
+     Best host is 'alpha'
+
+   Perl functions provide object oriented access to all of this
+information and more.
+
+   Also included is a program to warn of jobs with over two hours of CPU
+time, renice them to 19 and send mail to the offending user.
+
+   See `man Schedule::Load' after installation.
+
+Obtaining Distribution
+======================
+
+   The latest version is available at `http://www.perl.org/CPAN/'
+
+   Download the latest package from that site, and decompress.  `gunzip
+Schedule::Load_version.tar.gz ; tar xvf Schedule::Load_version.tar'
+
+Supported Systems
+=================
+
+   This version of Schedule::Load has been built and tested on:
+
+   * sparc-sun-solaris2.5.1
+
+   * i386-linux
+
+   It should run on any Unix system with perl and TCP/IP socketing,
+provided that the required perl modules below are ported to the
+platform.
+
+Installation
+============
+
+  1. Before installing this module, you need the following modules
+     available from CPAN:
+
+     Storable		(tested with 0.6.5)
+     Proc::ProcessTable;	(tested with 0.23)
+     Unix::Processors;	(tested with 1.6)
+
+  2. `cd' to the directory containing this INSTALL notice.
+
+  3. Type `perl Makefile.PL' to configure Schedule::Load for your
+     system.
+
+  4. Type `make' to compile Schedule::Load.
+
+  5. Type `make test' to check the compilation.
+
+  6. Type `make install' to install the programs and any data files and
+     documentation.
+
+
