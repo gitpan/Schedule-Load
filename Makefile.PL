@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.23 2004/03/10 18:29:58 wsnyder Exp $
+# $Id: Makefile.PL,v 1.27 2005/04/27 12:15:06 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -17,11 +17,11 @@ RSCHLIB_EDIT_FN = blib/lib/Schedule/Load/Reporter.pm
 
 pure_all::
 	\$(PERL) -p -e \"s!RSCHLIB = '.*'!RSCHLIB = '\$(RSCHLIB)'!g\" < \$(RSCHLIB_EDIT_FN) > \$(RSCHLIB_EDIT_FN).new
-	mv \$(RSCHLIB_EDIT_FN).new \$(RSCHLIB_EDIT_FN)
+	mv -f \$(RSCHLIB_EDIT_FN).new \$(RSCHLIB_EDIT_FN)
 
 install::
-	-mkdir -p   \$(RSCHLIB)/rschedule
-	-chmod a+rw \$(RSCHLIB)/rschedule
+	-mkdir -p    \$(RSCHLIB)/rschedule
+	-chmod a+rwx \$(RSCHLIB)/rschedule
 
 install-here::
 	make	RSCHLIB=/import/nauticus/common/lib \\
@@ -67,6 +67,7 @@ WriteMakefile(
 	      AUTHOR	=> 'Wilson Snyder <wsnyder@wsnyder.org>',
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
+	      NO_META	=> 1,
 	      PREREQ_PM => {'Proc::ProcessTable' => 0,
 			    'Unix::Processors' => 2.020,
 			    'Storable' => 0,

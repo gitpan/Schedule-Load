@@ -4,11 +4,13 @@
 @settitle Perl Schedule::Load Installation
 @c %**end of header
 
-@c $Id: readme.texi,v 1.13 2004/01/27 19:03:50 wsnyder Exp $
+@c $Id: readme.texi,v 1.14 2004/12/09 20:35:34 wsnyder Exp $
 @c DESCRIPTION: TexInfo: DOCUMENT source run through texinfo to produce README file
 @c Use 'make README' to produce the output file
+@c Before release, run C-u C-c C-u C-a (texinfo-all-menus-update)
 
 @node Top, Copyright, (dir), (dir)
+@chapter Schedule::Load
 
 This is the Schedule::Load Perl Package.
 

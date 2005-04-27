@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.38 2004/10/26 17:12:16 ws150726 Exp $
+# $Id: Host.pm,v 1.39 2005/04/27 12:02:46 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.020';
+$VERSION = '3.021';
 
 ######################################################################
 #### Globals

@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.42 2004/10/26 17:12:16 ws150726 Exp $
+# $Id: Schedule.pm,v 1.44 2005/04/27 12:02:46 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.020';
+$VERSION = '3.021';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -107,6 +107,7 @@ sub reserve {
 		      reserved=>$params->{comment},);
     $self->fetch();
     $host = $self->get_host($params->{host});	# Fetch might have new reference
+    ($host) or croak "%Error: Host $params->{host} not responding";
     ($host->reserved) or croak "%Error: Host $params->{host} didn't accept reservation";
 }
 
@@ -133,6 +134,7 @@ sub release {
 		      reserved=>0,);
     $self->fetch();
     $host = $self->get_host($params->{host});	# Fetch might have new reference
+    ($host) or croak "%Error: Host $params->{host} not responding";
     (!$host->reserved) or croak "%Error: Host $params->{host} didn't accept release";
 }
 

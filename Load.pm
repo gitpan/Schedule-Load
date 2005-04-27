@@ -1,8 +1,8 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.67 2004/10/26 17:12:16 ws150726 Exp $
+# $Id: Load.pm,v 1.71 2005/04/27 12:02:46 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2005 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -38,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.020';
+$VERSION = '3.021';
 $Debug = 0;
 
 %_Default_Params = (
@@ -215,10 +215,12 @@ Schedule::Load - Load distribution and status across multiple host machines
 
 This package provides useful utilities for load distribution and status
 across multiple machines in a network.  To just see what is up in the
-network, see the L<rschedule> command.
+network, see the L<rschedule> command.  For initial setup, see below.
 
-The system is composed of four unix programs (each also with a underlying
-Perl module):
+Most users do not need the Perl API, and can use the command line utilities
+that come with this package, and are installed in your standard binary
+directory like other unix applications.  This package provides these four
+Unix programs:
 
 =over 4 
 
@@ -268,6 +270,9 @@ requested the resource exits or is even killed without cleaning up.
 =back
 
 =head1 MODULES
+
+For those desiring finer control, or automation of new scripts, the Perl
+API may be used.  The Perl API includes the following major modules:
 
 =over 4 
 
@@ -367,6 +372,9 @@ time (~2%), the parent is the one shown in the loads list.
 When setting a new site with Schedule::Load, first read the DESCRIPTION
 section about the various daemons.  
 
+First, make sure you've built and installed this package on all of your
+machines.
+
 Then, pick a reliable master machine for the chooser.  Set the
 SLCHOOSED_HOST environment variable to include this host name, and add this
 setting to a site wide file so that all users including daemons may see it
@@ -375,7 +383,7 @@ be backups if the first machine is down.  Run slchoosed on the
 SLCHOOSED_HOST specified host(s).
 
 On all the hosts in the network you wish to schedule onto, check
-SLCHOOSED_HOST is set appropriately, then run slreportd.  Optionally run
+SLCHOOSED_HOST is set appropriately, then run slreportd. Optionally run
 pidstatd (from IPC::Locker) on these hosts also.
 
 The L<rschedule hosts> command should now show your hosts.
@@ -384,11 +392,18 @@ If you run slreportd before slchoosed, there may be a 60 second wait before
 slreportd detects the new slchoosed process is running.  During this time
 rschedule won't show all of the hosts.
 
+When everything is working manually, it's a good idea to set things up to
+run at boot time.  Manually kill all of the daemons you started.  Then,
+make init files in /etc/init.d so the daemons start at boot time.  Some
+examples are in the init.d directory provided by the distribution, but you
+will need to edit them.  Exactly how this works is OS dependent, please
+consult your documentation or the web.
+
 =head1 DISTRIBUTION
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2005 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

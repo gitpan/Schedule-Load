@@ -12,7 +12,7 @@ Load/Schedule.pm
 MANIFEST
 META.yml			Module meta-data (added by MakeMaker)
 Makefile.PL
-NEWS
+Changes
 README
 init.d/slchoosed
 init.d/slreportd

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $
+# $Id: rschedule,v 1.41 2005/04/27 12:00:20 wsnyder Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -36,6 +36,7 @@ use Config;
 $Debug = 0;
 my %server_params = ();
 my @commands = ();
+my @match_params;
 my $opt_fixed_load = 1;	# For fixedload
 my @opt_classes = ();
 my $opt_comment;
@@ -67,13 +68,14 @@ $result = &GetOptions (
 		       "load=i"		=> \$opt_fixed_load,
 		       "comment=s"	=> \$opt_comment,
 		       "kill:i"		=> \$opt_kill,
+		       "allow-reserved!"=> sub {shift; push @match_params, (allow_reserved => shift);},
 		       "similar!"	=> \$opt_similar,
 		       "<>"		=> \&cmd,
 		       );
 
 if (!$result) { &usage(); }
 
-my @match_params = (classes=>\@opt_classes);
+push @match_params, (classes=>\@opt_classes);
 if ($opt_similar) {
     push @match_params,
     (match_cb=>('sub { return 1'
@@ -226,7 +228,7 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $ ', "\n";
+    print '$Id: rschedule,v 1.41 2005/04/27 12:00:20 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -234,7 +236,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.40 2004/08/26 15:04:20 ws150726 Exp $ ';
+    print 'Id: $Id: rschedule,v 1.41 2005/04/27 12:00:20 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -406,6 +408,13 @@ Displays a listing of top processes across all hosts being monitored.
 =head1 ARGUMENTS
 
 =over 4
+
+=item --allow-reserved
+
+=item --no-allow-reserved
+
+Specifies if reserved hosts may be returned by the best, best_or_none,
+hostnames, idle_host_names, and jobs commands.
 
 =item --class <class>
 

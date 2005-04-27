@@ -1,9 +1,10 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Schedule-Load
-version:      3.020
+version:      3.021
 version_from: Load.pm
 installdirs:  site
+license:      perl
 requires:
     IPC::PidStat:                  1.41
     Proc::ProcessTable:            0
@@ -12,4 +13,4 @@ requires:
     Unix::Processors:              2.02
 
 distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+generated_by: hand
