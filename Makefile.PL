@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.27 2005/04/27 12:15:06 wsnyder Exp $
+# $Id: Makefile.PL,v 1.28 2005/08/05 14:59:52 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -68,7 +68,7 @@ WriteMakefile(
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
 	      NO_META	=> 1,
-	      PREREQ_PM => {'Proc::ProcessTable' => 0,
+	      PREREQ_PM => {'Proc::ProcessTable' => 0.40,
 			    'Unix::Processors' => 2.020,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,

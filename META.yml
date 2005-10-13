@@ -1,13 +1,13 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Schedule-Load
-version:      3.021
+version:      3.022
 version_from: Load.pm
 installdirs:  site
 license:      perl
 requires:
     IPC::PidStat:                  1.41
-    Proc::ProcessTable:            0
+    Proc::ProcessTable:            0.40
     Storable:                      0
     Time::HiRes:                   0
     Unix::Processors:              2.02

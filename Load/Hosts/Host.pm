@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.39 2005/04/27 12:02:46 wsnyder Exp $
+# $Id: Host.pm,v 1.41 2005/10/13 12:15:30 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.021';
+$VERSION = '2.022';
 
 ######################################################################
 #### Globals
@@ -389,6 +389,15 @@ Total number of processes in run or on processor state.
 =item total_pctcpu
 
 Total CPU percentage used by all processes.
+
+=item total_rss
+
+Total resident memory used by all processes.
+
+=item total_size
+
+Total memory size, resident and swapped, used by all processes. This will
+often exceed the physical memory size.
 
 =back
 

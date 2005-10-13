@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.69 2005/04/27 12:02:46 wsnyder Exp $
+# $Id: Hosts.pm,v 1.73 2005/10/13 12:15:30 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.021';
+$VERSION = '2.022';
 
 ######################################################################
 #### Globals
@@ -371,8 +371,8 @@ sub print_loads {
     my $hosts = shift;
     # Top processes
     my $out = "";
-    (my $FORMAT =           "%-12s   %6s    %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "RUNTM", "CPU","COMMAND"); 
+    (my $FORMAT =           "%-12s   %6s    %-8s    %3s   %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NIC", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
@@ -380,7 +380,9 @@ sub print_loads {
 	    $out.=sprintf ($FORMAT, 
 			   $host->hostname,
 			   $p->pid, 
-			   $p->uname, 		$p->time_hhmm,
+			   $p->uname,
+			   $p->nice,
+			   $p->time_hhmm,
 			   sprintf("%3.1f", $p->pctcpu),
 			   $comment,
 			   );

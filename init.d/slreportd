@@ -8,16 +8,34 @@
 # chkconfig: 23456 99 10
 # description: Slreportd provides process reporting services for Schedule::Load
 # processname: slreportd
+#
+### BEGIN INIT INFO
+# Provides:          slreportd
+# Required-Start:    $syslog $remote_fs $network
+# Should-Start:      pidstatd
+# Required-Stop:     $remote_fs $network
+# Should-Stop:
+# Default-Start:     3 5
+# Default-Stop:      0 1 2 6
+# Short-Description: slreportd
+# Description:       slreportd
+### END INIT INFO
 
 state=$1
+prog=/usr/local/bin/slreportd_site
 
 case $state in
-'start')
-        echo starting /usr/local/bin/slreportd if present
-	rm -f /tmp/TTYDEVS
-	mkdir -p /usr/local/lib/rschedule
-	chmod a+rwx /usr/local/lib/rschedule
-        [ -f /usr/local/bin/slreportd ] &&  su daemon -c /usr/local/bin/slreportd &
+  start)
+        if [ -f $prog ]; then
+            echo starting $prog
+	    #
+	    rm -f /tmp/TTYDEVS
+	    mkdir -p /usr/local/lib/rschedule
+	    chmod a+rwx /usr/local/lib/rschedule
+	    $prog &
+	else
+	    echo Service broken, not found: $prog
+	fi
 	exit 0
         ;;
   stop)

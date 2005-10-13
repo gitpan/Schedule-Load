@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.53 2005/04/27 12:02:46 wsnyder Exp $
+# $Id: Reporter.pm,v 1.59 2005/10/13 12:15:30 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -36,7 +36,7 @@ use Config;
 use strict;
 use vars qw($VERSION $RSCHLIB $Debug %User_Names %Pid_Inherit 
 	    @Pid_Time_Base @Pid_Time $Os_Linux
-	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu
+	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu $MicroTime
 	    $Exister
 	    );
 use Carp;
@@ -47,13 +47,14 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.021';
+$VERSION = '2.022';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
 $Divide_Pctcpu_By_Cpu = 0;   # Older linuxes may require this
+$MicroTime = ($Config{osname} =~ /linux/i) ? 1 : 1000;  # Fix in Proc::ProcessTable 0.40
 
 ######################################################################
 #### Globals
@@ -304,7 +305,7 @@ sub _fill_dynamic_pid {
 	$procref->{nice0} = $procref->{nice} - 20;
     }
 
-    $procref->{time} = $p->time / 1000.0;
+    $procref->{time} = $p->time / 1000.0 / (1000.0/$MicroTime);
 
     my $state = $p->state;
     $state = "cpu".$p->onpro if ($state eq "onprocessor");
@@ -329,6 +330,8 @@ sub _fill_dynamic {
 		        fixed_load => 0,
 			report_load => 0,
 			total_pctcpu => 0,
+			total_size => 0,
+			total_rss => 0,
 		    };
 
     my ($sec, $usec) = gettimeofday();
@@ -367,14 +370,14 @@ sub _fill_dynamic {
 		    ,$p->pid, $sec, $p->start, $sec-$p->start, $ustime, $pctcpu
 		    if 0;
 	    } else {
-		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1]) * 1000)
+		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1]) * $MicroTime)
 			       / $deltastamp
 			       );
 		$pctcpu /= $self->{const}{cpus} if $Divide_Pctcpu_By_Cpu;
 		printf "PIDCONT %d PCT %s CLOCK %d UTIME %d-%d=%d LOAD %f\n"
 		    ,$p->pid, $p->pctcpu||0, $deltastamp,
 		    ,$ustime, $Pid_Time[$p->pid][1], $ustime-$Pid_Time[$p->pid][1],
-		    ,$pctcpu if 0;
+		    ,$pctcpu if 1;
 	    }
 	    $Pid_Time[$p->pid] = [$p->start, $ustime];
 	}
@@ -438,6 +441,10 @@ sub _fill_dynamic {
 	    $self->{dynamic}{total_load} ++;
 	    $self->{dynamic}{report_load} ++ if !defined $fixed_load;
 	}
+
+	# Count memory
+	$self->{dynamic}{total_size} += _fix_overflow($p->size||0);  # Float, so doesn't overflow
+	$self->{dynamic}{total_rss}  += _fix_overflow($p->rss||0);  # Float, so doesn't overflow
     }
 
     # Look for any fixed loads that died
@@ -485,6 +492,17 @@ sub _comment {
     $Pid_Inherit{$pid}{pid} = $pid;
     $Pid_Inherit{$pid}{uid} = $params->{uid};
     $Pid_Inherit{$pid}{cmndcomment} = $cmndcomment;
+}
+
+######################################################################
+#### Math
+
+sub _fix_overflow {
+    my $value = shift;
+    # Bug in Proc::ProcessTable before version 0.40 causes 32 bit overflow
+    my $float = 0.1 + $value;
+    $float = 4.0*1024*1024*1024 - $float if $float<0;
+    return $float;
 }
 
 ######################################################################
