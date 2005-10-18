@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.46 2005/10/13 12:15:30 wsnyder Exp $
+# $Id: Schedule.pm,v 1.47 2005/10/18 12:42:19 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '2.022';
+$VERSION = '3.023';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 

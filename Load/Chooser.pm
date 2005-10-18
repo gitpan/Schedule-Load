@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.66 2005/10/13 12:15:29 wsnyder Exp $
+# $Id: Chooser.pm,v 1.67 2005/10/18 12:42:18 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '2.022';
+$VERSION = '3.023';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;

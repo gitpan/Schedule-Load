@@ -2,6 +2,10 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.023 10/18/2005
+
+****	Fix version numbering.  [Sergey Skvortsov]
+
 * Schedule::Load 3.022 10/13/2005
 
 ***	Added host total_size and total_rss memory sizes.  [Emil Kesler]
@@ -169,7 +173,7 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes,v 1.6 2005/10/13 12:15:29 wsnyder Exp $
+$Id: Changes,v 1.7 2005/10/18 12:42:18 wsnyder Exp $
 ----------------------------------------------------------------------
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
