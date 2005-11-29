@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.67 2005/10/18 12:42:18 wsnyder Exp $
+# $Id: Chooser.pm,v 1.69 2005/11/29 21:05:24 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.023';
+$VERSION = '3.024';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -214,12 +214,15 @@ sub _client_close {
 	delete $host->{dynamic};
 	_user_done_finish ($host);
 	delete $Hosts->{hosts}{$hostname};
+	foreach my $key (keys %{$host}) { delete $host->{$key}; }   # Avoid circular refs
     }
 
     $Select->remove($fh);
     eval {
 	$fh->close();
     };
+
+    foreach my $key (keys %{$client}) { delete $client->{$key}; }   # Avoid circular refs
     delete $Clients{$fh};
 }
 
@@ -718,7 +721,7 @@ sub _hold_delete {
     # Remove a load hold under speced key
     return if !defined $hold;
     print "$TimeStr _hold_delete($hold->{hold_key})\n" if $Debug;
-    delete $Holds{$hold->{hold_key}}{schreq};  # So don't loose memory from circular reference
+    foreach my $key (keys %{$Holds{$hold->{hold_key}}}) { delete $Holds{$hold->{hold_key}}{$key}; }  # Avoid circular refs
     delete $Holds{$hold->{hold_key}};
 }
 

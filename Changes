@@ -2,6 +2,12 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.024 11/29/2005
+
+****	Fix hardcoded library prefix.  [Sergey Skvortsov]
+
+****	Fix slchoosed memory leak.
+
 * Schedule::Load 3.023 10/18/2005
 
 ****	Fix version numbering.  [Sergey Skvortsov]
@@ -173,7 +179,7 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes,v 1.7 2005/10/18 12:42:18 wsnyder Exp $
+$Id: Changes,v 1.9 2005/11/29 21:04:14 wsnyder Exp $
 ----------------------------------------------------------------------
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].

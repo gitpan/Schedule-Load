@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.28 2005/08/05 14:59:52 wsnyder Exp $
+# $Id: Makefile.PL,v 1.29 2005/10/27 20:24:09 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -12,7 +12,7 @@ use Carp;
 sub MY::postamble {
 "
 
-RSCHLIB = /usr/local/lib
+RSCHLIB = $(PREFIX)/lib
 RSCHLIB_EDIT_FN = blib/lib/Schedule/Load/Reporter.pm
 
 pure_all::
@@ -72,7 +72,7 @@ WriteMakefile(
 			    'Unix::Processors' => 2.020,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,
-			    'IPC::PidStat' => 1.410,
+			    'IPC::Locker' => 1.410,	# IPC::PidStat, enclosed within
 			},
 	      EXE_FILES	=> [qw( rschedule slchoosed slreportd slpolice slrsh)],
 	      'clean'	=> {FILES => 'test_store', },

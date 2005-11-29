@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.74 2005/10/18 12:42:18 wsnyder Exp $
+# $Id: Hosts.pm,v 1.76 2005/11/29 21:05:24 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.023';
+$VERSION = '3.024';
 
 ######################################################################
 #### Globals
@@ -288,7 +288,7 @@ sub print_holds {
 		           code => "P",};
     }
     my $out = "";
-    (my $FORMAT =           "%-8s   %-12s    %5s      %5s   %2s  %1s   %7s    %-12s %-s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "%-10s  %-12s    %5s      %5s   %2s  %1s   %7s    %-12s %-s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "USER", "UHOST", "UPID", "PRI", "L", "S", "WAIT", "ON_HOST", "COMMENT");
     foreach my $key (sort (keys %holdlist)) {
 	my $hold = $holdlist{$key}{hold};
@@ -346,7 +346,7 @@ sub print_top {
     my $hosts = shift;
     # Top processes
     my $out = "";
-    (my $FORMAT =           "%-12s   %6s    %-8s     %4s    %6s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "%-12s   %6s    %-10s    %4s    %6s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
@@ -371,7 +371,7 @@ sub print_loads {
     my $hosts = shift;
     # Top processes
     my $out = "";
-    (my $FORMAT =           "%-12s   %6s    %-8s    %3s   %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "%-12s   %6s    %-10s   %3s   %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NIC", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
@@ -646,7 +646,7 @@ Schedule::Load::Hosts - Return host loading information across a network
     }
 
     # Top processes
-    (my $FORMAT =    "%-12s   %6s    %-8s      %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =    "%-12s   %6s    %-10s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     printf ($FORMAT, "HOST", "PID", "USER",  "STATE", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ($hosts->hosts) {
 	foreach $p ($host->top_processes) {

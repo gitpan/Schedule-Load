@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.60 2005/10/18 12:42:18 wsnyder Exp $
+# $Id: Reporter.pm,v 1.61 2005/11/29 21:05:24 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.023';
+$VERSION = '3.024';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 

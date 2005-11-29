@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
-# $Id: slpolice,v 1.24 2004/08/26 15:04:21 wsnyder Exp $
+# $Id: slpolice,v 1.25 2005/10/27 20:24:09 wsnyder Exp $
 ################ Introduction ################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2005 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -28,6 +28,7 @@ use vars qw($Debug
 	    $Nice19 $Sendmail
 	    $Opt_Renice_Min $Opt_Cpu_Min $Opt_Reserved_Min
 	    %Complaints
+	    @Opt_Cmds
 	    );
 
 $Nice19 = "renice19 -only_if_at";
@@ -36,14 +37,22 @@ $Sendmail = "/usr/lib/sendmail";
 ######################################################################
 
 my %opt_server_params = ();
+$Debug_User = $ENV{USER};   # Who to send --debug mail to
+
+Getopt::Long::config ("no_auto_abbrev");
 if (!GetOptions (
 		 "help"		=> \&usage,
 		 "debug!"	=> \$Debug,
-		 "cpu_min=i"	=> \$Opt_Cpu_Min,
-		 "renice_min=i"	=> \$Opt_Renice_Min,
-		 "reserved_min=i"=> \$Opt_Reserved_Min,
+		 "debug-user=s"	=> \$Debug_User,
+		 "cpu_min=i"	=> \$Opt_Cpu_Min,	# Old _'s
+		 "cpu-min=i"	=> \$Opt_Cpu_Min,
+		 "renice_min=i"	=> \$Opt_Renice_Min,	# Old _'s
+		 "renice-min=i"	=> \$Opt_Renice_Min,
+		 "reserved_min=i"=> \$Opt_Reserved_Min,	# Old _'s
+		 "reserved-min=i"=> \$Opt_Reserved_Min,
 		 "port=i"	=> sub {shift; $opt_server_params{port} = shift;},
 		 "dhost=s"	=> sub {shift; push @{$opt_server_params{dhost}}, split(':',shift);},
+		 "<>"		=> \&parameter,
 		 )) {
     usage();
 }
@@ -56,10 +65,22 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.24 2004/08/26 15:04:21 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.25 2005/10/27 20:24:09 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
+}
+
+sub parameter {
+    my $param = shift;
+    if ($param =~ /^(.*)=([0-9]+)$/) {
+	my $re = $1;  my $minutes = $2;
+	if ($re !~ /[.?*^\$]/) { $re = '^'.$re.'$'; }
+	print "Regexp for cmd: $re  $minutes\n" if $Debug;
+	push @Opt_Cmds, [qr/$re/, $minutes];
+    } else {
+	die "%Error: Unknown argument (missing=): $param\n";
+    }
 }
 
 ######################################################################
@@ -77,6 +98,7 @@ sub gather_loads {
 	    next if !$p->time;
 	    next if $name eq "root";
 	    my $pid = $p->pid;
+	    my $cmd = $p->fname||"";
 	    my $min = $p->time/60.0;
 	    $min = 0  if ($Debug);
 	    $min = 9999 if ($Debug && $p->uid eq $<);  # Test... Every one of runner's violates
@@ -89,9 +111,20 @@ sub gather_loads {
 				sprintf("%3.1f", $p->pctcpu),
 				$p->fname);
 
-	    print "Min $min  Name $name   Pid $pid\n" if $Debug;
-	    if ($Opt_Renice_Min
-		&& $min >= $Opt_Renice_Min) {
+	    print "Min $min  Name $name   Cmd $cmd  Pid $pid\n" if $Debug;
+	    my $renice_limit = $Opt_Renice_Min;
+	    my $cpu_limit    = $Opt_Cpu_Min;
+	    foreach my $cmdminref (@Opt_Cmds) {
+		my $re = $cmdminref->[0];  my $minutes = $cmdminref->[1];
+		if ($cmd =~ /$re/) {
+		    print "  Command_line_regexp match\n" if $Debug;
+		    if ($Opt_Renice_Min) { $renice_limit = $minutes; }
+		    if ($Opt_Cpu_Min) { $cpu_limit = $minutes; }
+		}
+	    }
+
+	    if ($renice_limit
+		&& $min >= $renice_limit) {
 		my $lowered = 0;
 		my $succ = `ssh $mach $Nice19 $pid 2>&1`;
 		print "Lowering $mach $pid $succ\n" if $Debug;
@@ -106,8 +139,8 @@ sub gather_loads {
 		}
 	    } 
 	    
-	    if ($Opt_Cpu_Min
-		&& $min >= $Opt_Cpu_Min) {
+	    if ($cpu_limit
+		&& $min >= $cpu_limit) {
 		$Complaints{$name}{cpu}{$pid}
 		    = {one_subject => sprintf("High CPU Time Process %5d on $mach", $pid),
 		       many_subject => sprintf("CPU Consuming Processes"),
@@ -173,7 +206,7 @@ sub complain {
 	my $body = "";
 	$body .= "DEBUGGING.  Really-To: $to\n\n" if $Debug;
 	my $mailto = $to;
-	$mailto = $ENV{USER} if $Debug;
+	$mailto = $Debug_User if $Debug;
 
 	my $subj = undef;
 	for my $topic (sort (keys %{$Complaints{$to}})) {
@@ -242,10 +275,15 @@ It will also mail if a user has a reservation for a long period of time.
 
 Usually slpolice is run with a crontab entry similar to:
 
-    5 8-21 * * * /usr/local/bin/slpolice --cpu_min 120 --reserved_min 120 >/dev/null 2>&1
+    5 8-21 * * * /usr/local/bin/slpolice --cpu_min 120 --reserved_min 120 long=999 >/dev/null 2>&1
 
 This sends warnings each hour after 2 hours of CPU time.  It does not check
 at night so that long overnight jobs will not receive warnings.
+
+Additional non-parameter arguments specify specific command regular
+expressions.  When a process' command matches that regexp, the specified
+number of minutes will be used to determine when to send mail instead of
+the default.
 
 This program is most valuable when used with the L<nicercizerd> program, or
 a operating system where nice 19 processes get only leftover cpu resources.
@@ -260,6 +298,10 @@ setgid root and renices a job to 19.  This comes with L<nicercizerd>.
 
 Displays this message and program version and exits.
 
+=item --debug-user
+
+With --debug, who to send the mail to instead of the process owner.
+
 =item --port <portnumber>
 
 Specifies the port number that slchoosed uses.
@@ -270,17 +312,17 @@ Specifies the host name that slchoosed uses.  May be specified multiple
 times to specify backup hosts.  Defaults to SLCHOOSED_HOST environment
 variable, which contains colon separated host names.
 
-=item --cpu_min
+=item --cpu-min
 
 Number of cpu minutes the job should have before being reported to the user.
 Defaults to 0, which is off.
 
-=item --renice_min
+=item --renice-min
 
-Number of minutes after which the nice value of a high cpu using process is
-not 10 is reniced to 19.  Defaults to 0, which is off.
+Number of minutes after which the nice value of a high cpu using process
+that is not at 1 or 10 is reniced to 19.  Defaults to 0, which is off.
 
-=item --reserved_min
+=item --reserved-min
 
 Number of minutes a host may be reserved before reporting it to the user.
 Defaults to 0, which is off.
@@ -297,7 +339,7 @@ The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
 L<nicercizerd> is available from L<http://veripool.com>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2005 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

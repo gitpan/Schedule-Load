@@ -1,4 +1,4 @@
-# $Id: ResourceReq.pm,v 1.13 2005/10/18 12:42:19 wsnyder Exp $
+# $Id: ResourceReq.pm,v 1.14 2005/11/29 21:05:24 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.023';
+$VERSION = '3.024';
 
 ######################################################################
 #### Creators
