@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.69 2005/11/29 21:05:24 wsnyder Exp $
+# $Id: Chooser.pm,v 1.77 2005/12/12 21:04:27 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -27,6 +27,7 @@ use Net::hostent;
 use Sys::Hostname;
 use Time::HiRes qw (gettimeofday);
 BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
+#use Devel::Leak; our $Leak;
 
 use Schedule::Load qw (:_utils);
 use Schedule::Load::Schedule;
@@ -36,7 +37,7 @@ use IPC::PidStat;
 use strict;
 use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Select
 	    $Exister
-	    $Time $Time_Usec $TimeStr
+	    $Time $Time_Usec
 	    $Server_Self %ChooInfo);
 use vars qw(%Holds);  # $Holds{hold_key}[listofholds] = HOLD {hostname=>, scheduled=>1,}
 use Carp;
@@ -47,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.024';
+$VERSION = '3.025';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -59,11 +60,10 @@ use constant RECONNECT_NUMBER  => 5;
 tie %Clients, 'Tie::RefHash';
 
 cache_time();
-$TimeStr = _timelog();
 %ChooInfo = (# Information to pass to "rschedule info"
 	     slchoosed_hostname => hostname(),
 	     slchoosed_connect_time => time(),
-	     slchoosed_status => "Connected",
+	     slchoosed_status => "Started",
 	     );
 
 ######################################################################
@@ -84,12 +84,16 @@ sub start {
     $Server_Self = $self;	# Only should be one... Need some options
 
     # Open the socket
-    print "$TimeStr Server up, listening on $self->{port}\n" if $Debug;
+    _timelog("Server up, listening on $self->{port}\n") if $Debug;
     my $server = IO::Socket::INET->new( Proto     => 'tcp',
 					LocalPort => $self->{port},
 					Listen    => SOMAXCONN,
 					Reuse     => 1)
 	or die "$0: Error, socket: $!";
+
+    # Update status
+    $ChooInfo{slchoosed_connect_time} = time();
+    $ChooInfo{slchoosed_status} = "Connected";
 
     $Select = IO::Select->new($server);
     $Hosts = Schedule::Load::Schedule->new(_fetched=>-1,);  #Mark as always fetched
@@ -103,7 +107,6 @@ sub start {
 	# Anything to read?
 	foreach my $fh ($Select->can_read(3)) { #3 secs maximum
 	    cache_time();	# Cache the time
-	    $TimeStr = _timelog() if $Debug;
 	    if ($fh == $server) {
 		# Accept a new connection
 		print "Accept\n" if $Debug;
@@ -131,7 +134,6 @@ sub start {
 	# Action or timer expired, only do this if time passed
 	if (time() != $Time) {
 	    cache_time();	# Cache the time
-	    $TimeStr = _timelog() if $Debug;
 	    _hold_timecheck();
 	    _client_ping_timecheck();
 	}
@@ -203,18 +205,18 @@ sub _client_close {
     my $client = shift || return;
 
     my $fh = $client->{socket};
-    print "$TimeStr Closing client $fh\n" if $Debug;
+    _timelog("Closing client $fh\n") if $Debug;
 
     if ($client->{host}) {
 	my $host = $client->{host};
 	my $hostname = $host->hostname || "";	# Will be deleted, so get before delete
-	print "$TimeStr  Closing host ",$host->hostname,"\n" if $Debug;
+	_timelog(" Closing host ",$host->hostname,"\n") if $Debug;
 	delete $host->{const};	# Delete before user_done, so user doesn't see them
 	delete $host->{stored};
 	delete $host->{dynamic};
 	_user_done_finish ($host);
+	delete $host->{client};
 	delete $Hosts->{hosts}{$hostname};
-	foreach my $key (keys %{$host}) { delete $host->{$key}; }   # Avoid circular refs
     }
 
     $Select->remove($fh);
@@ -222,8 +224,15 @@ sub _client_close {
 	$fh->close();
     };
 
-    foreach my $key (keys %{$client}) { delete $client->{$key}; }   # Avoid circular refs
+    delete $client->{host};   # Prevent circular ref leak
     delete $Clients{$fh};
+
+    if (0) { #Leak checking
+	$fh = undef;
+	$client = undef;
+	#Devel::Leak::CheckSV($Leak) if $Leak;
+	#Devel::Leak::NoteSV($Leak);
+    }
 }
 
 sub _client_close_all {
@@ -269,7 +278,7 @@ sub _client_service {
 	next if $client->{_broken};
 	my $line = $1;
 	#print "CHOOSER GOT: $line\n" if $Debug;
-	print "$TimeStr $client->{host}{hostname}  " if ($Debug && $client->{host});
+	_timelog("$client->{host}{hostname}  ") if ($Debug && $client->{host});
 	my ($cmd, $params) = _pthaw($line, $Debug);
 
 	if ($cmd eq "report_ping") {
@@ -339,7 +348,7 @@ sub _client_ping_timecheck {
     foreach my $client (values %Clients) {
 	#print "Ping Check $client->{ping} Now $Time  Dead $Server_Self->{dead_time}\n" if $Debug;
 	if ($client->{host} && ($client->{ping} < ($Time - $Server_Self->{dead_time}))) {
-	    print "$TimeStr Client hasn't pinged lately, disconnecting\n" if $Debug;
+	    _timelog("Client hasn't pinged lately, disconnecting\n") if $Debug;
 	    _client_close ($client);
 	}
     }
@@ -358,7 +367,7 @@ sub _host_start {
     my $hostname = $params->{hostname};
 
     # Only sent at first establishment, so we blow away old info
-    print "$TimeStr Connecting $hostname\n" if $Debug;
+    _timelog("Connecting $hostname\n") if $Debug;
     my $host = {  client => $client,
 		  hostname => $hostname,
 		  waiters => {},
@@ -372,7 +381,7 @@ sub _host_start {
     # Remove any earlier connection
     my $oldhost = $Hosts->{hosts}{$hostname};
     if (defined $oldhost->{client}) {
-	print "$TimeStr $hostname was connected before, reconnected\n" if $Debug;
+	_timelog("$hostname was connected before, reconnected\n") if $Debug;
 	if ($host->{const}{slreportd_connect_time}
 	    < ($oldhost->{const}{slreportd_connect_time} + RECONNECT_TIMEOUT)) {
 	    $host->{const}{slreportd_status} = "Reconnected";
@@ -435,7 +444,7 @@ sub _user_to_reporter {
 	my $host = $Hosts->{hosts}{$hostname};
 	next if !$host;
 	$host->{ping_update} = 0;	# Kill cache, will need refresh
-	print "$TimeStr _user_to_reporter ->$hostname $cmd" if $Debug;
+	_timelog("_user_to_reporter ->$hostname $cmd") if $Debug;
 	_client_send ($host->{client}, $cmd);
     }
 }
@@ -444,21 +453,27 @@ sub _user_get {
     my $userclient = shift;
     my $cmd = shift;
     my $flags = shift;
-    
-    _user_done_action ($userclient
-		       , sub {
-			   _user_send ($userclient, $flags);
-			   _client_done ($userclient);
-		       });
+
+    my $cmd_start_time = [$Time, $Time_Usec];
+    _user_done_action ($userclient,
+		       \&_user_send_done_cb, [$userclient, $flags, $cmd_start_time]);
     _user_all_hosts_cmd ($userclient, $cmd);
     _user_done_check($userclient);
+}
+
+sub _user_send_done_cb {
+    my $userclient = shift;
+    my $flags = shift;
+    my $cmd_start_time = shift;
+    _user_send ($userclient, $flags, $cmd_start_time);
+    _client_done ($userclient);
 }
 
 sub _user_all_hosts_cmd {
     my $userclient = shift;
     my $cmd = shift;
     foreach my $host ($Hosts->hosts) {
-	print "$TimeStr GET ->", $host->hostname, " $cmd" if $Debug;
+ 	_timelog("GET ->", $host->hostname, " $cmd") if $Debug;
 	if ($host->{ping_update} < ($Time - $Server_Self->{cache_time})) {
 	    if (_client_send ($host->{client}, $cmd)) {
 		# Mark that we need activity from each of these before being done
@@ -471,13 +486,14 @@ sub _user_all_hosts_cmd {
 sub _user_send {
     my $client = shift;
     my $types = shift;
+    my $cmd_start_time = shift;
     # Send requested types of information back to the user
-    print "$TimeStr _user_send $client $types\n" if $Debug;
+    _timelog("_user_send $client $types\n") if $Debug;
     _holds_adjust();
     _user_send_type ($client, "const") if ($types =~ /const/);
     _user_send_type ($client, "stored") if ($types =~ /load/);
     _user_send_type ($client, "dynamic") if ($types =~ /load/ || $types =~ /proc/);
-    _make_chooinfo();
+    _make_chooinfo  (($Time - $cmd_start_time->[0]) + ($Time_Usec - $cmd_start_time->[1]) * 1.0e-6);
     _client_send    ($client, _pfreeze ("chooinfo", \%ChooInfo, 0)) if ($types =~ /chooinfo/);
 }
 
@@ -485,17 +501,21 @@ sub _user_send_type {
     my $client = shift;
     my $type = shift;
     # Send specific data type to user
+    my @frozen;
     foreach my $host ($Hosts->hosts) {
 	if (defined $host->{$type}) {
-	    #print "$TimeStr Host $host name $host->{hostname}\n" if $Debug;
+	    #_timelog("Host $host name $host->{hostname}\n") if $Debug;
 	    my %params = (table => $host->{$type},
 			  type => $type,
 			  hostname => $host->{hostname},
 			  );
-	    if (0==_client_send ($client, _pfreeze ("host", \%params, 0&&$Debug))) {
-		last;	# Send failed
-	    }
+	    # Rather then sending lots of little packets, join them all up to send
+	    # in one large packet.
+	    push @frozen, _pfreeze ("host", \%params, 0&&$Debug);
 	}
+    }
+    if (0==_client_send ($client, join('',@frozen))) {
+	# Send failed
     }
 }
 
@@ -504,8 +524,10 @@ sub _user_send_type {
 sub _user_done_action {
     my $userclient = shift;
     my $callback = shift;
-    $userclient->{wait_action} = $callback;
+    my $argsref = shift;
     $userclient->{wait_count} = 0;
+    $userclient->{wait_action} = $callback;
+    $userclient->{wait_action_argsref} = $argsref;
 }
 
 sub _user_done_mark {
@@ -522,7 +544,7 @@ sub _user_done_finish {
     # Host finished, dec count see if done with everything client needed
 
     foreach my $userclient (keys %{$host->{waiters}}) {
-	print "$TimeStr Dewait $host $userclient\n" if $Debug;
+	_timelog("Dewait $host $userclient\n") if $Debug;
 	delete $host->{waiters}{$userclient};
 	$userclient->{wait_count} --;
 	_user_done_check($userclient);
@@ -532,8 +554,10 @@ sub _user_done_finish {
 sub _user_done_check {
     my $userclient = shift;
     if ($userclient->{wait_count} == 0) {
-	print "$TimeStr Dewait *DONE*\n" if $Debug;
-	&{$userclient->{wait_action}}();
+	_timelog("Dewait *DONE*\n") if $Debug;
+	&{$userclient->{wait_action}} (@{$userclient->{wait_action_argsref}});
+	$userclient->{wait_action} = undef;  # Done, prevent leaks
+	$userclient->{wait_action_argsref} = undef;  # Done, prevent leaks
     }
 }
 
@@ -557,10 +581,8 @@ sub _user_schedule {
     my $userclient = shift;
     my $schparams = shift;
     
-    _user_done_action ($userclient
-		       , sub {
-			   _user_schedule_sendback($userclient, $schparams);
-		       });
+    _user_done_action ($userclient,
+		       \&_user_schedule_sendback, [$userclient, $schparams]);
     _user_all_hosts_cmd ($userclient, "report_get_dynamic\n");
     _user_done_check($userclient);
 }
@@ -585,7 +607,7 @@ sub _schedule_one_resource {
     my $bestref = undef;
     my $bestrating = undef;
     my $favorref = undef;
-    my $favorhost = $Hosts->get_host($resreq->{favor_host}) || 0;
+    my $favorhost = 0; $favorhost = $Hosts->get_host($resreq->{favor_host}) || 0 if ($resreq->{favor_host});
     my $freecpus = 0;
     my $totcpus = 0;
     # hosts_match takes: classes, match_cb, allow_reserved
@@ -644,7 +666,7 @@ sub _schedule {
     _holds_clear_unallocated();
     _holds_adjust();
     
-    print "$TimeStr _schedule $schhold->{hold_key}\n" if $Debug;
+    _timelog("_schedule $schhold->{hold_key}\n") if $Debug;
     _hold_add_schreq($schparams);
     $schparams->{hold} = undef;  # Now have schparams under hold, don't need circular reference
 
@@ -720,8 +742,8 @@ sub _hold_delete {
     my $hold = shift;
     # Remove a load hold under speced key
     return if !defined $hold;
-    print "$TimeStr _hold_delete($hold->{hold_key})\n" if $Debug;
-    foreach my $key (keys %{$Holds{$hold->{hold_key}}}) { delete $Holds{$hold->{hold_key}}{$key}; }  # Avoid circular refs
+    _timelog("_hold_delete($hold->{hold_key})\n") if $Debug;
+    delete $Holds{$hold->{hold_key}}{schreq};  # So don't loose memory from circular reference
     delete $Holds{$hold->{hold_key}};
 }
 
@@ -786,7 +808,7 @@ sub _exist_traffic {
     my ($pid,$exists,$onhost) = $Exister->recv_stat();
     return if !defined $pid;
     return if $exists;   # We only care about known-missing processes
-    print "$TimeStr   UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n" if $Debug;
+    _timelog("  UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n") if $Debug;
     # We don't maintain a table sorted by pid, as these messages
     # are rare, and there can be many holds per pid.
     foreach my $hold (values %Holds) {
@@ -802,8 +824,10 @@ sub _exist_traffic {
 #### Information to pass up to "rschedule status" for debugging
 
 sub _make_chooinfo {
+    my $delta_time = shift;
     # Load information we want to pass up to rschedule for debugging chooser
     # details from a client application
+    $ChooInfo{last_command_delay} = $delta_time;
     $ChooInfo{schreqs} = {};
     foreach my $hold (values %Holds) {
 	next if !$hold->{schreq};
@@ -816,8 +840,11 @@ sub _make_chooinfo {
 #### Little stuff
 
 sub _timelog {
-    my ($sec,$min,$hour,$mday,$mon) = localtime($Time);
-    return sprintf ("[%02d/%02d %02d:%02d:%02d] ", $mon+1, $mday, $hour, $min, $sec);
+    my $msg = join('',@_);
+    my ($time, $time_usec) = gettimeofday();
+    my ($sec,$min,$hour,$mday,$mon) = localtime($time);
+    printf +("[%02d/%02d %02d:%02d:%02d.%06d] %s",
+	     $mon+1, $mday, $hour, $min, $sec, $time_usec, $msg);
 }
 
 ######################################################################

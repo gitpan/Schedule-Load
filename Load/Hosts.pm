@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.76 2005/11/29 21:05:24 wsnyder Exp $
+# $Id: Hosts.pm,v 1.81 2005/12/12 21:04:27 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.024';
+$VERSION = '3.025';
 
 ######################################################################
 #### Globals
@@ -309,32 +309,36 @@ sub print_holds {
     return $out;
 }
 
+use Time::localtime;
+sub _format_time {
+    my $value = shift || 0;
+    my $t = localtime($value);
+    return sprintf("%04d/%02d/%02d %02d:%02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min,$t->sec);
+}
+
 sub print_status {
     my $hosts = shift;
     # Daemon status, mostly for debugging
     my $out = "";
     {
-	(my $FORMAT =           "%-12s     %-17s        %s\n") =~ s/\s\s+/ /g;
-	$out.=sprintf ($FORMAT, "CHOOSER", "CONNECTED", "DAEMON STATUS");
-	my $t = localtime($hosts->{chooinfo}{slchoosed_connect_time}||0);
-	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
+	(my $FORMAT =           "%-12s     %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
+	$out.=sprintf ($FORMAT, "CHOOSER", "CONNECTED", "DELAY", "DAEMON STATUS");
 	$out.=sprintf ($FORMAT,
 		       $hosts->{chooinfo}{slchoosed_hostname},
-		       $tm,
+		       _format_time($hosts->{chooinfo}{slchoosed_connect_time}||0),
+		       sprintf("%2.3f",$hosts->{chooinfo}{last_command_delay}||0),
 		       $hosts->{chooinfo}{slchoosed_status});
     }
 
-    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-17s        %6s      %s\n") =~ s/\s\s+/ /g;
+    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DELAY", "DAEMON STATUS");
     foreach my $host ( @{$hosts->hosts} ){
-	my $t = localtime($host->slreportd_connect_time||0);
-	my $tm = sprintf("%04d/%02d/%02d %02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min);
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
 		       $host->adj_load, 
 		       $host->rating_text,
-		       $tm,
+		       _format_time($host->slreportd_connect_time||0),
 		       (defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
 		       $host->slreportd_status,
 		       );
@@ -530,6 +534,24 @@ sub _open {
 sub _request {
     my $self = shift;
     my $cmd = shift;
+    my %params = (req_retries => ($self->{req_retries}||3),
+		  req_retry_delay => ($self->{req_retry_delay}||20),
+		  );
+
+    for (my $retry=0; $retry<$params{req_retries}; $retry++) {
+  	my $done = $self->_request_try($cmd);
+	if ($done) {
+	    last;
+	} else {
+	    print "RETRY\n" if $Debug;
+	    sleep $params{req_retry_delay};
+	}
+    }
+}
+
+sub _request_try {
+    my $self = shift;
+    my $cmd = shift;
 
     if (!defined $self->{_fh}) {
 	$self->_open;
@@ -541,6 +563,7 @@ sub _request {
 
     my $done;
     my $eof;
+    my $completed;
     while (!$done) {
 	if ($self->{_inbuffer} !~ /\n/) {
 	    my $data = '';
@@ -556,10 +579,12 @@ sub _request {
 	    my $line = $1;
 	    chomp $line;
 	    print "GOT $line\n" if $Debug;
+
 	    my ($cmd, $params) = _pthaw($line, $Debug);
 	    next if $line =~ /^\s*$/;
 	    if ($cmd eq "DONE") {
 		$done = 1;
+		$completed = 1;
 	    } elsif ($cmd eq "host") {
 		$self->_host_load ($params);
 	    } elsif ($cmd eq "schrtn") {
@@ -577,6 +602,7 @@ sub _request {
 	undef $self->{_fh};
     }
     print "_request DONE-> $cmd\n" if $Debug;
+    return $completed;
 }
 
 ######################################################################

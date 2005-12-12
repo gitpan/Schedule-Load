@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.27 2004/08/26 15:04:20 wsnyder Exp $
+# $Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -111,8 +111,10 @@ while (1) {
     # Restart this program by re-execing; allows users to restart the daemon
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
     print "exec $0, @Orig_ARGV\n" if $Debug;
+    # Note if testing this, the exec will use the installed library, not the local library
     exec $0, @Orig_ARGV if -x $0;
     # If can't exec we simply start the server again
+    #print "Exec failed, looping again\n" if $Debug;
 }
 
 exit (0);
@@ -120,7 +122,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.27 2004/08/26 15:04:20 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -128,7 +130,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.27 2004/08/26 15:04:20 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

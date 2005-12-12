@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.74 2005/11/29 21:06:01 wsnyder Exp $
+# $Id: Load.pm,v 1.77 2005/12/12 21:04:26 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2005 by Wilson Snyder.  This program is free software;
@@ -38,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.024';
+$VERSION = '3.025';
 $Debug = 0;
 
 %_Default_Params = (
@@ -48,6 +48,8 @@ $Debug = 0;
 		    dhost=> [(defined $ENV{SLCHOOSED_HOST})
 			     ? split ':', $ENV{SLCHOOSED_HOST}
 			     : qw(localhost)],
+		    req_retries=>3,		# Number of tries before we bail out
+		    req_retry_delay=>10,	# After being closed, delay for failover server to come up
 		    );
 
 ######################################################################
@@ -109,7 +111,7 @@ sub _pthaw {
 
     my $ref = thaw(pack ("h*", $serialized)) if $serialized;
     if ($debug) {
-	printf "$cmd: %s\n", Data::Dumper::Dumper($ref);
+	print "$cmd: ", Data::Dumper::Dumper($ref);
     }
     return ($cmd, $ref);
 }
@@ -121,6 +123,7 @@ sub _pthaw {
 
 package Schedule::Load::Socket;
 use IO::Socket;
+use Time::HiRes qw(usleep gettimeofday);
 
 use strict;
 use vars qw(@ISA);
@@ -167,7 +170,7 @@ sub send_and_check {
 	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
 	    return 0;
 	}
-	if (!defined $rv) { sleep 1; next; }  # Couldn't write: very rare
+	if (!defined $rv) {  usleep 1000; next; }  # Couldn't write: very rare
 	# Truncate what did get out
 	$out = substr ($out, $rv);
     }
@@ -398,6 +401,18 @@ make init files in /etc/init.d so the daemons start at boot time.  Some
 examples are in the init.d directory provided by the distribution, but you
 will need to edit them.  Exactly how this works is OS dependent, please
 consult your documentation or the web.
+
+=head1 ENVIRONMENT
+
+=over 4 
+
+=item SLCHOOSED_HOST
+
+A colon separated list of hostnames to contact to find slchoosed.  They
+will be contacted in order; after the first connection is established,
+remaining hostnames will be backups.
+
+=back
 
 =head1 DISTRIBUTION
 

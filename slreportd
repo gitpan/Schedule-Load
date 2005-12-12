@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.32 2004/09/08 14:28:29 wsnyder Exp $
+# $Id: slreportd,v 1.33 2005/12/02 22:35:59 wsnyder Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -114,6 +114,7 @@ while (1) {
     # Restart this program by re-execing; allows users to restart the daemon
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
     print "exec $0, @Orig_ARGV\n" if $Debug;
+    # Note if testing this, the exec will use the installed library, not the local library
     exec $0, @Orig_ARGV if -x $0;
     # If can't exec we simply start the server again
 }
@@ -136,7 +137,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.32 2004/09/08 14:28:29 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.33 2005/12/02 22:35:59 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -144,7 +145,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.32 2004/09/08 14:28:29 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.33 2005/12/02 22:35:59 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }

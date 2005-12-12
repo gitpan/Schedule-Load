@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.61 2005/11/29 21:05:24 wsnyder Exp $
+# $Id: Reporter.pm,v 1.63 2005/12/12 21:04:27 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.024';
+$VERSION = '3.025';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -377,7 +377,7 @@ sub _fill_dynamic {
 		printf "PIDCONT %d PCT %s CLOCK %d UTIME %d-%d=%d LOAD %f\n"
 		    ,$p->pid, $p->pctcpu||0, $deltastamp,
 		    ,$ustime, $Pid_Time[$p->pid][1], $ustime-$Pid_Time[$p->pid][1],
-		    ,$pctcpu if 1;
+		    ,$pctcpu if $Debug;
 	    }
 	    $Pid_Time[$p->pid] = [$p->start, $ustime];
 	}

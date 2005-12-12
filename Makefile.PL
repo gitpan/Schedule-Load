@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.29 2005/10/27 20:24:09 wsnyder Exp $
+# $Id: Makefile.PL,v 1.31 2005/12/02 19:12:01 wsnyder Exp $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2004 by Wilson Snyder.  This program is free software;
@@ -10,9 +10,10 @@ use ExtUtils::MakeMaker;
 use Carp;
 
 sub MY::postamble {
-"
-
-RSCHLIB = $(PREFIX)/lib
+    ($ENV{RSCHLIB}
+     ? "RSCHLIB = $ENV{RSCHLIB}\n"
+     : "RSCHLIB = \$(PREFIX)/lib\n")
+."
 RSCHLIB_EDIT_FN = blib/lib/Schedule/Load/Reporter.pm
 
 pure_all::
