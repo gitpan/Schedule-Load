@@ -1,8 +1,8 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.29 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: FakeReporter.pm,v 1.32 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -14,6 +14,7 @@
 ######################################################################
 
 package Schedule::Load::FakeReporter;
+use Schedule::Load::Reporter;  # For ProcTimeToSec
 require 5.004;
 @ISA = qw(Schedule::Load::Reporter);
 
@@ -25,7 +26,7 @@ use POSIX;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.025';
+$VERSION = '3.030';
 
 ######################################################################
 #### Local process table
@@ -74,13 +75,17 @@ sub table {
         if ($pref->{fixed_load}) {  # Else it might only be a comment
 	    $pref->{start} ||= time();
 	    my $pctcpu = 100*int(($pref->{fixed_load}||1)/ $load_limit);
+	    my $time = (time()-$pref->{start})*($pctcpu/100);
+	    # Convert TO process time, as Reporter will convert proc back to seconds
+	    $time = $time / $Schedule::Load::Reporter::ProcTimeToSec;
+
 	    my $proc = Schedule::Load::FakeReporter::ProcessTable::Process->new
 		(pid=>$pid,
 		 ppid=>0,
 		 pctcpu=>$pctcpu,
 		 utime=>0, stime=>0,
 		 start=>$pref->{start},
-		 time=>(time()-$pref->{start})*1000.0*($pctcpu/100),  # Is in msec
+		 time=>$time,  # Is in usec
 		 uid=>$pref->{uid}||0,
 		 state=>'run',
 		 priority=>1,
@@ -166,7 +171,7 @@ See L<Schedule::Load::Reporter> for most accessors.
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

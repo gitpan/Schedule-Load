@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
-# $Id: slpolice,v 1.25 2005/10/27 20:24:09 wsnyder Exp $
+# $Id: slpolice,v 1.27 2006/04/10 19:04:50 wsnyder Exp $
 ################ Introduction ################
 #
-# Copyright 2000-2005 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -65,7 +65,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.25 2005/10/27 20:24:09 wsnyder Exp $ ', "\n";
+    print '$Id: slpolice,v 1.27 2006/04/10 19:04:50 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -116,7 +116,7 @@ sub gather_loads {
 	    my $cpu_limit    = $Opt_Cpu_Min;
 	    foreach my $cmdminref (@Opt_Cmds) {
 		my $re = $cmdminref->[0];  my $minutes = $cmdminref->[1];
-		if ($cmd =~ /$re/) {
+		if ($cmd =~ /$re/ || $p->uname =~ /$re/) {
 		    print "  Command_line_regexp match\n" if $Debug;
 		    if ($Opt_Renice_Min) { $renice_limit = $minutes; }
 		    if ($Opt_Cpu_Min) { $cpu_limit = $minutes; }
@@ -339,7 +339,7 @@ The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
 L<nicercizerd> is available from L<http://veripool.com>.
 
-Copyright 1998-2005 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

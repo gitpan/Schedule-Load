@@ -1,8 +1,8 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.81 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: Hosts.pm,v 1.84 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.025';
+$VERSION = '3.030';
 
 ######################################################################
 #### Globals
@@ -87,10 +87,12 @@ sub restart {
     my $self = shift;
     my $params = {
 	chooser=>1,
+	chooser_if_reporters=>0,
 	reporter=>1,
 	@_,};
-    $self->_request("chooser_restart\n") if $params->{chooser};
     $self->_request("report_restart\n") if $params->{reporter};
+    $self->_request("chooser_restart_if_reporters\n") if $params->{chooser_if_reporters};
+    $self->_request("chooser_restart\n") if $params->{chooser} && !$params->{chooser_if_reporters};
 }
 sub _chooser_close_all {
     my $self = shift;
@@ -778,7 +780,7 @@ The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

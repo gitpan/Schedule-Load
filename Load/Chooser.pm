@@ -1,8 +1,8 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.77 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: Chooser.pm,v 1.85 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -48,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.025';
+$VERSION = '3.030';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -59,7 +59,7 @@ use constant RECONNECT_NUMBER  => 5;
 %Clients = ();
 tie %Clients, 'Tie::RefHash';
 
-cache_time();
+stash_time();
 %ChooInfo = (# Information to pass to "rschedule info"
 	     slchoosed_hostname => hostname(),
 	     slchoosed_connect_time => time(),
@@ -77,8 +77,11 @@ sub start {
     my $self = {
 	%Schedule::Load::_Default_Params,
 	#Documented
-	cache_time=>5,	# Secs to hold cache for
+	cache_time=>10,	# Secs to hold cache for
 	dead_time=>45,	# Secs lack of ping indicates dead
+	subchooser_restart_num=>12,		# For first 12 times,
+	subchooser_first_time=>20,		# Sec between first 12 chooser_restart_if_reporters
+	subchooser_repeat_time=>(10*60),	# Sec between other chooser_restart_if_reporters
 	@_,};
     bless $self, $class;
     $Server_Self = $self;	# Only should be one... Need some options
@@ -101,15 +104,15 @@ sub start {
     $Exister = new IPC::PidStat();
     $Select->add($Exister->fh);
 
-    $self->_probe_reset();
+    $self->_probe_reset_check();
 
     while (1) {
 	# Anything to read?
 	foreach my $fh ($Select->can_read(3)) { #3 secs maximum
-	    cache_time();	# Cache the time
+	    stash_time();	# Cache the time
 	    if ($fh == $server) {
 		# Accept a new connection
-		print "Accept\n" if $Debug;
+		_timelog("Accept\n") if $Debug;
 		my $clientfh = $server->accept();
 		next if !$clientfh;
 		$Select->add($clientfh);
@@ -133,14 +136,15 @@ sub start {
 	}
 	# Action or timer expired, only do this if time passed
 	if (time() != $Time) {
-	    cache_time();	# Cache the time
+	    stash_time();	# Cache the time
 	    _hold_timecheck();
 	    _client_ping_timecheck();
+	    $self->_probe_reset_check();
 	}
     }
 }
 
-sub cache_time {
+sub stash_time {
     # Cache the time, store in a variable to avoid a OS call inside a loop
     ($Time, $Time_Usec) = gettimeofday();
 }
@@ -161,7 +165,7 @@ sub _probe_init {
     foreach my $host (@hostlist) {
 	my $hostx = $host;
 	if (my $h = gethost($host)) {
-	    print "_probe_init (host $host => ",$host_this->name,")\n" if $Debug;
+	    _timelog("_probe_init (host $host => ",$host_this->name,")\n") if $Debug;
 	    if (lc($h->name) eq lc($host_this->name)) {
 		$hit = 1;
 	    } elsif ($hit) {
@@ -169,29 +173,40 @@ sub _probe_init {
 	    }
 	}
     }
-    print "_probe_init subhosts= (@subhosts)\n" if $Debug;
+    _timelog("_probe_init subhosts= (@subhosts)\n") if $Debug;
     $self->{_subhosts} = \@subhosts;
+}
+
+sub _probe_reset_check {
+    my $self = shift;
+    # Send a _probe_reset every so often
+    if (($self->{_probe_reset_next_time}||0) < $Time) {
+	my $delay = ((($self->{_probe_reset_times}||0) < $self->{subchooser_restart_num})
+		     ? $self->{subchooser_first_time} : $self->{subchooser_repeat_time});
+	$self->{_probe_reset_times}++;
+	$self->{_probe_reset_next_time} = $Time + $delay;
+	$self->_probe_reset();
+    }
 }
 
 sub _probe_reset {
     my $self = shift;
-
     # Tell all subserviant hosts that a new master is on the scene.
     # Start at top and work down, want to ignore ourself and everyone
     # before ourself.
     $self->_probe_init();
     foreach my $host (@{$self->{_subhosts}}) {
-	print "_probe_reset $host $self->{port} trying...\n" if $Debug;
+	_timelog("_probe_reset $host $self->{port} trying...\n") if $Debug;
 	my $fhreset = Schedule::Load::Socket->new (
 					     PeerAddr  => $host,
 					     PeerPort  => $self->{port},
 					     Timeout   => $self->{timeout},
 					     );
 	if ($fhreset) {
-	    print "_probe_reset $host restarting\n" if $Debug;
-	    print $fhreset _pfreeze("chooser_restart", {}, $Debug);
+	    _timelog("_probe_reset $host restarting\n") if $Debug;
+	    print $fhreset _pfreeze("chooser_restart_if_reporters", {}, $Debug);
 	    $fhreset->close();
-	    print "_probe_reset $host DONE\n" if $Debug;
+	    _timelog("_probe_reset $host DONE\n") if $Debug;
 	}
     }
 }
@@ -277,7 +292,7 @@ sub _client_service {
     while ($client->{inbuffer} =~ s/^([^\n]*)\n//) {
 	next if $client->{_broken};
 	my $line = $1;
-	#print "CHOOSER GOT: $line\n" if $Debug;
+	#_timelog("CHOOSER GOT: $line\n") if $Debug;
 	_timelog("$client->{host}{hostname}  ") if ($Debug && $client->{host});
 	my ($cmd, $params) = _pthaw($line, $Debug);
 
@@ -317,6 +332,15 @@ sub _client_service {
 	    # Overall fork loop will deal with it.
 	    warn "-Info: chooser_restart\n" if $Debug;
 	    exit(0);
+	} elsif ($cmd eq "chooser_restart_if_reporters") {
+	    # Used by master chooser to restart subservient chooser
+	    foreach my $host ($Hosts->hosts, (values %Clients)) {
+		next if $host eq $client;   # Skip the requestor itself
+		# Overall fork loop will deal with it.
+		warn "-Info: chooser_restart_if_reporters\n" if $Debug;
+		exit(0);
+	    } # else no hosts
+	    _client_done ($client);
 	} elsif ($cmd eq "chooser_close_all") {
 	    _client_close_all ($client);
 	} else {
@@ -403,7 +427,7 @@ sub _host_start {
     tie %{$host->{waiters}}, 'Tie::RefHash';
     $Hosts->{hosts}{$hostname} = $host;
     $client->{host} = $host;
-    #print "const: ", Data::Dumper::Dumper($host) if $Debug;
+    #_timelog("const: ", Data::Dumper::Dumper($host)) if $Debug;
 }
 
 sub _host_const_chooseinfo {
@@ -610,12 +634,15 @@ sub _schedule_one_resource {
     my $favorhost = 0; $favorhost = $Hosts->get_host($resreq->{favor_host}) || 0 if ($resreq->{favor_host});
     my $freecpus = 0;
     my $totcpus = 0;
-    # hosts_match takes: classes, match_cb, allow_reserved
-    foreach my $host ($Hosts->hosts_match(%{$resreq})) {
+    # hosts_match can be slow, plus it constructs a list.  It's faster to loop here.
+    foreach my $host ($Hosts->hosts) {
+	# host_match takes: classes, match_cb, allow_reserved
+	next if !$host->host_match($resreq);
+	# Process the host
 	$totcpus += $host->cpus;
 	my $rating = $host->rating ($resreq->{rating_cb});
-	print "\tTest host ", $host->hostname," rate $rating, free ",$host->free_cpus,"\n" if $Debug;
-	#print Data::Dumper->Dump([$host], ['host']),"\n" if $Debug;
+	_timelog("\tTest host ", $host->hostname," rate $rating, free ",$host->free_cpus,"\n") if $Debug;
+	#_timelog(Data::Dumper->Dump([$host], ['host']),"\n") if $Debug;
 	if ($rating > 0) {
 	    my $machfreecpus = $host->free_cpus;
 	    $freecpus += $machfreecpus;
@@ -646,6 +673,8 @@ sub _schedule_one_resource {
 	$bestref = undef;
     }
     $jobs = _max($jobs, 1);
+    _timelog("    _Schedule_one Jobs $jobs Totcpu $totcpus  Free $freecpus  Running ".($resreq->{jobs_running}||0)
+	     ." Max $resreq->{max_jobs}\n") if $Debug;
     
     return ($bestref,$jobs);
 }
@@ -653,6 +682,7 @@ sub _schedule_one_resource {
 sub _schedule {
     # Choose the best host and total resources available for scheduling
     my $schparams = shift;  #allow_none=>$, hold=>ref, requests=>[ref,ref...]
+    _timelog("_schedule $schparams->{hold}{hold_key}\n") if $Debug;
     
     # Clear holds for this request, the user may have scheduled (and failed) earlier.
     my $schhold = $schparams->{hold};
@@ -666,11 +696,11 @@ sub _schedule {
     _holds_clear_unallocated();
     _holds_adjust();
     
-    _timelog("_schedule $schhold->{hold_key}\n") if $Debug;
     _hold_add_schreq($schparams);
     $schparams->{hold} = undef;  # Now have schparams under hold, don't need circular reference
 
     # Loop through all requests and issue hold keys to those we can
+    _timelog("_schedule_loop $schhold->{hold_key}\n") if $Debug;
     my $resdone = 1;
     my @reshostnames = ();
     my $resjobs;
@@ -678,12 +708,12 @@ sub _schedule {
 	my $schreq = $hold->{schreq};
 	next if !$schreq;
 	# Careful, we generally want $schreq rather then $schparams in this loop...
-	print "  SCHREQ for $hold->{hold_key}\n" if $Debug;
+	_timelog("  SCHREQ for $hold->{hold_key}\n") if $Debug;
 	foreach my $resref (@{$schreq->{resources}}) {
-	    print "    Ressch for $hold->{hold_key}\n" if $Debug;
+	    _timelog("    Ressch for $hold->{hold_key}\n") if $Debug;
 	    my ($bestref,$jobs) = _schedule_one_resource($schreq,$resref);
 	    if ($bestref) {
-		print "      Resdn $jobs on ",$bestref->hostname," for $hold->{hold_key}\n" if $Debug;
+		_timelog("      Resdn $jobs on ",$bestref->hostname," for $hold->{hold_key}\n") if $Debug;
 		# Hold this resource so next schedule loop doesn't hit it
 		_hold_add_host($hold, $bestref);
 	    }
@@ -705,7 +735,7 @@ sub _schedule {
 	# We don't need to do another hold_new, since we've changed the reference each host points to.
     }
 
-    print "DONE_HOLDS:  ",Data::Dumper::Dumper (\%Holds) if $Debug;
+    _timelog("DONE_HOLDS:  ",Data::Dumper::Dumper (\%Holds)) if $Debug;
 
     # Return the list of hosts we scheduled
     return {jobs => $resjobs,
@@ -760,11 +790,11 @@ sub _holds_clear_unallocated {
 sub _hold_timecheck {
     # Called once every 3 seconds.
     # See if any holds have expired; if so delete them
-    #print "hold_timecheck $Time\n" if $Debug;
+    #_timelog("hold_timecheck $Time\n") if $Debug;
     foreach my $hold (values %Holds) {
 	$hold->{expires} ||= ($Time + ($hold->{hold_time}||10));
 	if ($Time > $hold->{expires}) {
-	    #print "HOST DONE MARK $host $hostname $key EXP $hold->{expires}\n" if $Debug;
+	    #_timelog("HOST DONE MARK $host $hostname $key EXP $hold->{expires}\n") if $Debug;
 	    # Same cleanup below in _exist_traffic
 	    _hold_delete ($hold);
 	} else {
@@ -775,7 +805,7 @@ sub _hold_timecheck {
 
 sub _holds_adjust {
     # Adjust loading on all machines to make up for scheduler holds
-    print "HOLDS:  ",Data::Dumper::Dumper (\%Holds) if $Debug;
+    _timelog("HOLDS:  ",Data::Dumper::Dumper (\%Holds)) if $Debug;
 
     # Reset adjusted loads
     foreach my $host ($Hosts->hosts) {
@@ -804,10 +834,10 @@ sub _holds_adjust {
 
 sub _exist_traffic {
     # Handle UDP responses from our $Exister->pid_request calls.
-    #print "UDP PidStat in...\n" if $Debug;
+    #_timelog("UDP PidStat in...\n") if $Debug;
     my ($pid,$exists,$onhost) = $Exister->recv_stat();
     return if !defined $pid;
-    return if $exists;   # We only care about known-missing processes
+    return if !defined $exists || $exists;   # We only care about known-missing processes
     _timelog("  UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n") if $Debug;
     # We don't maintain a table sorted by pid, as these messages
     # are rare, and there can be many holds per pid.
@@ -900,7 +930,7 @@ dead.
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

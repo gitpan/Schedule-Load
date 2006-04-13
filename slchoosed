@@ -1,9 +1,9 @@
 #!/usr/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $
+# $Id: slchoosed,v 1.30 2006/04/06 19:52:12 wsnyder Exp $
 ################ Introduction ################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -122,7 +122,7 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $ ', "\n";
+    print '$Id: slchoosed,v 1.30 2006/04/06 19:52:12 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -130,7 +130,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed,v 1.28 2005/12/02 22:35:59 wsnyder Exp $ ';
+    print 'Id: $Id: slchoosed,v 1.30 2006/04/06 19:52:12 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -201,7 +201,8 @@ and ctrl-C to stop the daemon.
 
 =item --port
 
-Specifies the port number that slchoosed uses.
+Specifies the port number that slchoosed uses.  Defaults to SLCHOOSED_PORT
+environment variable or slchoosed service, or 1752.
 
 =item --version
 
@@ -213,7 +214,7 @@ Displays program version and exits.
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

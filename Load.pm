@@ -1,8 +1,8 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm,v 1.77 2005/12/12 21:04:26 wsnyder Exp $
+# $Id: Load.pm,v 1.82 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2005 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -38,13 +38,15 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.025';
+$VERSION = '3.030';
 $Debug = 0;
 
 %_Default_Params = (
 		    min_pctcpu=>3,
-		    port=>(getservbyname ('slchoosed',"")
-			   ? 'slchoosed' : 1752),
+		    port=>((defined $ENV{SLCHOOSED_PORT})	# Debugging
+			   ? $ENV{SLCHOOSED_PORT}
+			   : (getservbyname ('slchoosed',"")
+			      ? 'slchoosed' : 1752)),
 		    dhost=> [(defined $ENV{SLCHOOSED_HOST})
 			     ? split ':', $ENV{SLCHOOSED_HOST}
 			     : qw(localhost)],
@@ -59,6 +61,7 @@ sub _subprocesses {
     my $parent = shift || $$;
     # All pids under the given parent
     # Used by testing module
+    # Same function in Parallel::Forker::_subprocesses
     use Proc::ProcessTable;
     my $pt = new Proc::ProcessTable( 'cache_ttys' => 1); 
     my %parent_pids;
@@ -167,6 +170,7 @@ sub send_and_check {
 	    return 0;
 	}
 	my $rv = eval { return $fh->syswrite($out); };
+	# Node ->connected call does a system getpeeraddr() call
 	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
 	    return 0;
 	}
@@ -412,13 +416,19 @@ A colon separated list of hostnames to contact to find slchoosed.  They
 will be contacted in order; after the first connection is established,
 remaining hostnames will be backups.
 
+=item SLCHOOSED_PORT
+
+Default port number that slchoosed uses.  If not defined, defaults to
+/etc/services assigned slchoosed port number, or if not specified there,
+1752.
+
 =back
 
 =head1 DISTRIBUTION
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2005 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

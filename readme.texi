@@ -4,7 +4,7 @@
 @settitle Perl Schedule::Load Installation
 @c %**end of header
 
-@c $Id: readme.texi,v 1.14 2004/12/09 20:35:34 wsnyder Exp $
+@c $Id: readme.texi,v 1.15 2006/03/02 13:01:11 wsnyder Exp $
 @c DESCRIPTION: TexInfo: DOCUMENT source run through texinfo to produce README file
 @c Use 'make README' to produce the output file
 @c Before release, run C-u C-c C-u C-a (texinfo-all-menus-update)
@@ -25,7 +25,7 @@ This is the Schedule::Load Perl Package.
 @node Copyright, Description, Top, Top
 @section Copyright
 
-This package is Copyright 2000-2004 by Wilson Snyder @email{wsnyder@@wsnyder.org}.
+This package is Copyright 2000-2006 by Wilson Snyder @email{wsnyder@@wsnyder.org}.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of either the GNU General Public License or the

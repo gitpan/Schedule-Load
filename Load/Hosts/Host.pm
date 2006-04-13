@@ -1,8 +1,8 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.44 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: Host.pm,v 1.48 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -21,22 +21,23 @@ require AutoLoader;
 
 use Schedule::Load qw(_min _max);
 use Schedule::Load::Hosts::Proc;
+use Schedule::Load::Safe;
 
-use Safe;
 use Carp;
 use strict;
-use vars qw($VERSION $AUTOLOAD $Debug);
+use vars qw($VERSION $AUTOLOAD $Debug $Safer);
 
 ######################################################################
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.025';
+$VERSION = '3.030';
 
 ######################################################################
 #### Globals
 
 $Debug = $Schedule::Load::Debug;
+$Safer = Schedule::Load::Safe->new();
 
 ######################################################################
 #### Special status
@@ -92,15 +93,21 @@ sub get_undef {
 
 sub host_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
-    my %params = (classes=>[],
-		  match_cb=> undef,
-		  allow_reserved=>1,
-		  @_,
-		  );
+    # Params can be either a hash reference (for chooser)
+    # or a list of parameters (simple user functions)
+    my $paramref = $_[0];
+    if (!ref $paramref) {
+	$paramref = {#classes=>[],
+		     #match_cb=> undef,
+		     #allow_reserved=>1,
+		     @_,
+		 };
+    }
     # For use of Hosts::hosts_match
-    return ($self->classes_match($params{classes})
-	    && $self->eval_match ($params{match_cb})
-	    && (!$self->reserved || $params{allow_reserved})
+    return ((!defined $paramref->{classes} || $self->classes_match($paramref->{classes}))
+	    && (!defined $paramref->{match_cb} || $self->eval_match ($paramref->{match_cb}))
+	    && (!defined $paramref->{allow_reserved} || $paramref->{allow_reserved}
+		|| !$self->reserved)
 	    );
 }
 
@@ -126,27 +133,7 @@ sub _eval_generic_cb {
     my $self = shift;
     my $subref = shift;
     # Call &$subref($self) in safe container
-    if (ref $subref) {
-	return $subref->($self);
-    } else {
-	my $compartment = new Safe;
-	$compartment->permit(qw(:base_core));
-	$@ = "";
-	@_ = ($self);  # Arguments to pass to reval
-	my $code = $compartment->reval($subref);
-	if ($@ || !$code) {
-	    print "eval_match: $@: $subref\n" if $Debug;
-	    return 0;
-	}
-	my $result = $code->($self);
-	if ($Debug) {   # Try again in non-safe container
-	    @_ = ($self);  # Arguments to pass to reval
-	    my $dcode = eval($subref);
-	    my $dresult = $dcode->($self);
-	    die "%Error: Safe mismatch: '$result' ne '$dresult'\n" if $dresult ne $result;
-	}
-	return $result;
-    }
+    return $Safer->eval_cb($subref,$self);
 }
 
 ######################################################################
@@ -405,7 +392,7 @@ often exceed the physical memory size.
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

@@ -1,13 +1,25 @@
 #!/bin/sh
 # DESCRIPTION: Example file to put in /etc/init.d to run daemon
 #
-# Copyright 2002-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2002-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 #
 # chkconfig: 23456 99 10
 # description: Slchoosed provides clump-wide scheduling services for Schedule::Load
 # processname: slchoosed
+#
+### BEGIN INIT INFO
+# Provides:          slchoosed
+# Required-Start:    $syslog $remote_fs pidstatd
+# Should-Start:      cron
+# Required-Stop:
+# Should-Stop:
+# Default-Start:     3 5
+# Default-Stop:      0 1 2 6
+# Short-Description: slchoosed
+# Description:       slchoosed
+### END INIT INFO
 
 state=$1
 

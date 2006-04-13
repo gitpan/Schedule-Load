@@ -1,4 +1,7 @@
+Changes
 COPYING
+init.d/slchoosed
+init.d/slreportd
 Load.pm
 Load/Chooser.pm
 Load/FakeReporter.pm
@@ -8,14 +11,12 @@ Load/Hosts/Host.pm
 Load/Hosts/Proc.pm
 Load/Reporter.pm
 Load/ResourceReq.pm
+Load/Safe.pm
 Load/Schedule.pm
+Makefile.PL
 MANIFEST
 META.yml			Module meta-data (added by MakeMaker)
-Makefile.PL
-Changes
 README
-init.d/slchoosed
-init.d/slreportd
 readme.texi
 rschedule
 slchoosed
@@ -23,5 +24,7 @@ slpolice
 slreportd
 slrsh
 t/00_pod.t
+t/10_safe.t
 t/50_test.t
 t/test_utils.pl
+

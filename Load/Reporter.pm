@@ -1,8 +1,8 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.63 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: Reporter.pm,v 1.67 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -36,7 +36,7 @@ use Config;
 use strict;
 use vars qw($VERSION $RSCHLIB $Debug %User_Names %Pid_Inherit 
 	    @Pid_Time_Base @Pid_Time $Os_Linux
-	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu $MicroTime
+	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu $ProcTimeToSec
 	    $Exister
 	    );
 use Carp;
@@ -47,14 +47,14 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.025';
+$VERSION = '3.030';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
 $Os_Linux = $Config{osname} =~ /linux/i;
 $Distrust_Pctcpu = $Config{osname} !~ /solaris/i;	# Only solaris has instantanous reporting
 $Divide_Pctcpu_By_Cpu = 0;   # Older linuxes may require this
-$MicroTime = ($Config{osname} =~ /linux/i) ? 1 : 1000;  # Fix in Proc::ProcessTable 0.40
+$ProcTimeToSec = ($Config{osname} =~ /linux/i) ? 1e-6 : 1e-3;  # Fix in Proc::ProcessTable 0.40
 
 ######################################################################
 #### Globals
@@ -305,7 +305,7 @@ sub _fill_dynamic_pid {
 	$procref->{nice0} = $procref->{nice} - 20;
     }
 
-    $procref->{time} = $p->time / 1000.0 / (1000.0/$MicroTime);
+    $procref->{time} = $p->time * $ProcTimeToSec;
 
     my $state = $p->state;
     $state = "cpu".$p->onpro if ($state eq "onprocessor");
@@ -336,7 +336,7 @@ sub _fill_dynamic {
 
     my ($sec, $usec) = gettimeofday();
     @Pid_Time_Base = ($sec,$usec) if !defined $Pid_Time_Base[0];
-    my $deltastamp = ($sec-$Pid_Time_Base[0])*1e6 + ($usec-$Pid_Time_Base[1]);
+    my $deltastamp = ($sec-$Pid_Time_Base[0]) + 1e-6*($usec-$Pid_Time_Base[1]);
     @Pid_Time_Base = ($sec,$usec);
 
     # Note the $p refs cannot be cached, they change when a new table call occurs
@@ -370,8 +370,9 @@ sub _fill_dynamic {
 		    ,$p->pid, $sec, $p->start, $sec-$p->start, $ustime, $pctcpu
 		    if 0;
 	    } else {
-		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1]) * $MicroTime)
-			       / $deltastamp
+		$pctcpu = 100*(( ($ustime-$Pid_Time[$p->pid][1])
+				 * $ProcTimeToSec)
+			       / $deltastamp  # Seconds
 			       );
 		$pctcpu /= $self->{const}{cpus} if $Divide_Pctcpu_By_Cpu;
 		printf "PIDCONT %d PCT %s CLOCK %d UTIME %d-%d=%d LOAD %f\n"
@@ -528,7 +529,7 @@ sub _exist_traffic {
     print "UDP PidStat in...\n" if $Debug;
     my ($pid,$exists,$onhost) = $Exister->recv_stat();
     return if !defined $pid;
-    return if $exists;   # We only care about known-missing processes
+    return if !defined $exists || $exists;   # We only care about known-missing processes
     print "  UDP PidStat PID $onhost:$pid no longer with us.  RIP.\n" if $Debug;
     foreach my $pref (values %Pid_Inherit) {
 	if ($pref && $pref->{req_pid}==$pid && $pref->{req_hostname} eq $onhost) {
@@ -662,7 +663,7 @@ is lost.)   The path must be **ABSOLUTE** as the daemons do a chdir.
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 

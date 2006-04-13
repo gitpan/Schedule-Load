@@ -1,8 +1,8 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.49 2005/12/12 21:04:27 wsnyder Exp $
+# $Id: Schedule.pm,v 1.52 2006/04/13 18:26:52 wsnyder Exp $
 ######################################################################
 #
-# Copyright 2000-2004 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
 # 
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.025';
+$VERSION = '3.030';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -249,7 +249,7 @@ sub night_hours_p {
 
 ######################################################################
 ######################################################################
-#### Changing persistant store's on a host
+#### Changing persistent store's on a host
 
 sub set_stored {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts)';
@@ -391,7 +391,7 @@ live-locked out of getting anything!)
 
 The latest version is available from CPAN and from L<http://www.veripool.com/>.
 
-Copyright 1998-2004 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License or the Perl Artistic License.
 
