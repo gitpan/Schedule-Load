@@ -1,10 +1,10 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Schedule-Load
-version:      3.030
+version:      3.040
 version_from: Load.pm
 installdirs:  site
-license:      perl
+license:      perlSandBox/workwsnyder/perltools/Schedule-Load/
 requires:
     IPC::PidStat:                  1.41
     Proc::ProcessTable:            0.40

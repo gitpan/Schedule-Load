@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.85 2006/04/13 18:26:52 wsnyder Exp $
+# $Id: Chooser.pm,v 1.87 2006/07/19 13:54:55 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -48,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.030';
+$VERSION = '3.040';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -669,12 +669,17 @@ sub _schedule_one_resource {
     } else {
 	$jobs = _min($jobs, $resreq->{max_jobs} - ($resreq->{jobs_running}||0));
     }
-    if ($schparams->{allow_none} && ($jobs<1)) {
+    my $keep_idle = $resreq->{keep_idle_cpus} || 0;
+    if (($resreq->{keep_idle_cpus}||0) < 0) {  # Fraction that's percent of clump if negative
+	$keep_idle = _max($keep_idle, int($totcpus * (-$resreq->{keep_idle_cpus})));
+    }
+    if ($schparams->{allow_none} && ($jobs<1 || $freecpus < $keep_idle)) {
 	$bestref = undef;
     }
     $jobs = _max($jobs, 1);
-    _timelog("    _Schedule_one Jobs $jobs Totcpu $totcpus  Free $freecpus  Running ".($resreq->{jobs_running}||0)
-	     ." Max $resreq->{max_jobs}\n") if $Debug;
+    _timelog("    _Schedule_one Best ".($bestref?1:'none')
+	     ." Jobs $jobs Totcpu $totcpus  Free $freecpus  Running ".($resreq->{jobs_running}||0)
+	     ." Max $resreq->{max_jobs} KI $keep_idle\n") if $Debug;
     
     return ($bestref,$jobs);
 }

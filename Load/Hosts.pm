@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.84 2006/04/13 18:26:52 wsnyder Exp $
+# $Id: Hosts.pm,v 1.86 2006/07/19 13:54:55 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.030';
+$VERSION = '3.040';
 
 ######################################################################
 #### Globals
@@ -257,7 +257,7 @@ sub print_hosts {
 		       $host->cpus_slash, 
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
-		       $host->adj_load,
+		       sprintf("%2.2f", $host->adj_load),
 		       $host->rating_text,
 		       ( ($host->reservable?"R":" ")
 			 . digit($host,'load_limit')),
@@ -338,7 +338,7 @@ sub print_status {
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
-		       $host->adj_load, 
+		       sprintf("%2.2f", $host->adj_load),
 		       $host->rating_text,
 		       _format_time($host->slreportd_connect_time||0),
 		       (defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
@@ -668,7 +668,7 @@ Schedule::Load::Hosts - Return host loading information across a network
 		       $host->cpus_slash, 
 		       $host->max_clock, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
-		       $host->adj_load, 
+		       sprintf("%2.2f", $host->adj_load),
 		       $host->archname ." ". $host->osvers, 
 		       );
     }

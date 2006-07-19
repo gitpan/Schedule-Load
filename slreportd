@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.35 2006/04/06 19:52:12 wsnyder Exp $
+# $Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -137,7 +137,7 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.35 2006/04/06 19:52:12 wsnyder Exp $ ', "\n";
+    print '$Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $ ', "\n";
     $SIG{__WARN__} = sub{};	#pod2text isn't clean.
     pod2text($0);
     exit(1);
@@ -145,7 +145,7 @@ sub usage {
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.35 2006/04/06 19:52:12 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $ ';
     print "\n";
     exit (1);
 }
@@ -248,6 +248,15 @@ rating will make the machine less desirable for scheduling.
 Multiply the specified value to the rating obtained for the machine.  The
 value 2 would act the same as a halved clock frequency, making the machine
 less desirable for scheduling.
+
+=item load_pctcpu={1|0}
+
+When set, determine load as a floating point number based on CPU usage
+percentage of all tasks.  Default, or when clear, load is a absolute number
+where each high CPU job counts as one job, regardless of what percentage of
+the CPU is used.  Using pctcpu tends to keep CPUs busy more often, at the
+possible expense of slowing down interactive jobs that are not using an
+entire CPU.
 
 =back
 

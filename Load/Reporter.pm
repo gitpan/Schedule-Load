@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.67 2006/04/13 18:26:52 wsnyder Exp $
+# $Id: Reporter.pm,v 1.69 2006/07/19 13:54:55 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.030';
+$VERSION = '3.040';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -437,10 +437,16 @@ sub _fill_dynamic {
 
 	# Count total loading
 	$self->{dynamic}{total_pctcpu} += $pctcpu;
-	if (($p->state eq "run" || $p->state eq "onprocessor")
-	    && ($p->pid != $$)) {	# Exclude ourself
-	    $self->{dynamic}{total_load} ++;
-	    $self->{dynamic}{report_load} ++ if !defined $fixed_load;
+	if (($p->pid != $$)) {	# Exclude ourself
+	    my $load = ($self->{const}{load_pctcpu}
+			? ($pctcpu/100.0)
+			: (($p->state eq "run" || $p->state eq "onprocessor") ? 1:0));
+	    $load = 1 if ($load > 0.90 && $load < 1.10);  # 90% of a CPU really is close to full CPU, as slreportd takes some time itself
+	    if ($load) {
+		$self->{dynamic}{total_load}  += $load;
+		$self->{dynamic}{report_load} += $load if !defined $fixed_load;
+		#print "PID ",$p->pid," ADD LOAD $load PCT $pctcpu\n" if $Debug;
+	    }
 	}
 
 	# Count memory

@@ -1,4 +1,4 @@
-# $Id: ResourceReq.pm,v 1.17 2006/04/13 18:26:52 wsnyder Exp $
+# $Id: ResourceReq.pm,v 1.19 2006/07/19 13:54:55 wsnyder Exp $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.030';
+$VERSION = '3.040';
 
 ######################################################################
 #### Creators
@@ -139,6 +139,12 @@ there are disk access time benefits to doing so.  Defaults to the current host.
 =item jobs_running
 
 Current number of jobs the requester is running.  This is compared to max_jobs.
+
+=item keep_idle_cpus
+
+Minimum of cpus that should remain idle before scheduling this job.
+Negative fraction indicates that percentage of the clump, for example -0.5
+will keep at least 50% of all CPUsidle.  Defaults to 0.
 
 =item match_cb
 

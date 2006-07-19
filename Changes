@@ -2,10 +2,21 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.040 7/19/2006
+
+***	Added slrsh --summary option.
+
+***	Added keep_idle_cpus option to reserve some CPUs for other jobs.
+
+***	Added reporter load_pctcpu option to counteract low CPU% jobs.
+	When set, Schedule::Load::Host->fixed_load may now return a float.
+
+****	Fake Reporters now include information on the originator of the request.
+
 * Schedule::Load 3.030 4/13/2006
 
-***	Fix some hosts getting stuck with secondary chooser when primary server goes
-	up, down and up quickly.
+***	Fix some hosts getting stuck with secondary chooser when primary server
+	goes up, down and up quickly.
 
 ****	Speed up slchoosed when prioritizing across hundreds of hosts.
 
@@ -198,7 +209,7 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes,v 1.19 2006/04/13 18:26:52 wsnyder Exp $
+$Id: Changes,v 1.24 2006/07/19 13:54:55 wsnyder Exp $
 DESCRIPTION: Documentation on change history for this package
 ----------------------------------------------------------------------
 
