@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: slrsh,v 1.25 2006/07/19 13:53:36 wsnyder Exp $
+# $Id: slrsh 98 2007-04-03 15:22:10Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -16,7 +16,7 @@
 require 5.005;
 use IO::File;
 use IO::Pipe;
-use Pod::Text;
+use Pod::Usage;
 use Getopt::Long;
 use POSIX ":sys_wait_h";
 use Term::ReadLine;
@@ -52,7 +52,9 @@ if (!GetOptions (
 		 "debug!"	=> \$Debug,
 		 "<>"		=> \&parameter,
 		 )) {
-    &usage(); }
+    die "%Error: Bad usage, try 'slrsh --help'\n";
+}
+
 push @params, @ARGV;
 
 # Choose hosts to execute on
@@ -79,9 +81,8 @@ sub parameter {
 }
 
 sub usage {
-    print '$Id: slrsh,v 1.25 2006/07/19 13:53:36 wsnyder Exp $ ', "\n";
-    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
-    pod2text($0);
+    print '$Id: slrsh 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 

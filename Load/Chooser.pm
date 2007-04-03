@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm,v 1.87 2006/07/19 13:54:55 wsnyder Exp $
+# $Id: Chooser.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -48,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -64,6 +64,7 @@ stash_time();
 	     slchoosed_hostname => hostname(),
 	     slchoosed_connect_time => time(),
 	     slchoosed_status => "Started",
+	     slchoosed_version => $VERSION,
 	     );
 
 ######################################################################
@@ -308,6 +309,7 @@ sub _client_service {
 	} elsif ($cmd eq "report_dynamic") {
 	    _host_dynamic ($client, "dynamic", $params);
 	    $client->{host}{ping_update} = $Time;
+	    $client->{host}{ping_pending} = 0;
 	    _user_done_finish ($client->{host});
 	}
 	# User commands
@@ -468,6 +470,7 @@ sub _user_to_reporter {
 	my $host = $Hosts->{hosts}{$hostname};
 	next if !$host;
 	$host->{ping_update} = 0;	# Kill cache, will need refresh
+	$host->{ping_pending} = 0;	# Kill cache, will need refresh
 	_timelog("_user_to_reporter ->$hostname $cmd") if $Debug;
 	_client_send ($host->{client}, $cmd);
     }
@@ -498,10 +501,21 @@ sub _user_all_hosts_cmd {
     my $cmd = shift;
     foreach my $host ($Hosts->hosts) {
  	_timelog("GET ->", $host->hostname, " $cmd") if $Debug;
-	if ($host->{ping_update} < ($Time - $Server_Self->{cache_time})) {
-	    if (_client_send ($host->{client}, $cmd)) {
-		# Mark that we need activity from each of these before being done
+	if ($host->{ping_update} > ($Time - $Server_Self->{cache_time})) {
+	    _timelog("    skipping: _cached ",$host->hostname,"\n") if $Debug;
+	} else {
+	    # Cache is out of date.
+	    if ($host->{ping_pending}  # Otherwise only issue one request, it'll satisfy everyone.
+		&& $host->{ping_pending} > ($Time - $Server_Self->{dead_time})) { # Recent
+		# Already issued response, but haven't gotten it, wait for existing request
+		_timelog("    skipping: _ping_pending ",$host->hostname,"\n") if $Debug;
 		_user_done_mark ($host, $userclient);
+	    } else {
+		if (_client_send ($host->{client}, $cmd)) {
+		    # Mark that we need activity from each of these before being done
+		    _user_done_mark ($host, $userclient);
+		    $host->{ping_pending} = $Time;
+		} # Else host down; ignore it
 	    }
 	}
     }
@@ -614,6 +628,7 @@ sub _user_schedule {
 sub _schedule_one_resource {
     my $schparams = shift;
     my $resreq = shift;		# ResourceReq reference
+    my $resscratch = shift;	# Passed to user's callback; not safe for internals; they may modify it!
     
     #Factors:
     #  hosts_match:  reserved, match_cb, classes
@@ -637,11 +652,12 @@ sub _schedule_one_resource {
     # hosts_match can be slow, plus it constructs a list.  It's faster to loop here.
     foreach my $host ($Hosts->hosts) {
 	# host_match takes: classes, match_cb, allow_reserved
-	next if !$host->host_match($resreq);
+	next if !$host->host_match_chooser($resreq,$resscratch);
 	# Process the host
 	$totcpus += $host->cpus;
 	my $rating = $host->rating ($resreq->{rating_cb});
-	_timelog("\tTest host ", $host->hostname," rate $rating, free ",$host->free_cpus,"\n") if $Debug;
+	_timelog("\tTest host ", $host->hostname," rate $rating, cpus ",$host->cpus,", free ",$host->free_cpus,"\n") if $Debug;
+	#_timelog("\t     adj_load ",$host->adj_load,", load_limit ",$host->load_limit,"\n") if $Debug;
 	#_timelog(Data::Dumper->Dump([$host], ['host']),"\n") if $Debug;
 	if ($rating > 0) {
 	    my $machfreecpus = $host->free_cpus;
@@ -714,13 +730,15 @@ sub _schedule {
 	next if !$schreq;
 	# Careful, we generally want $schreq rather then $schparams in this loop...
 	_timelog("  SCHREQ for $hold->{hold_key}\n") if $Debug;
+	my %resscratch = ( partial_hosts=>[] );   # Passed to the user's callback
 	foreach my $resref (@{$schreq->{resources}}) {
 	    _timelog("    Ressch for $hold->{hold_key}\n") if $Debug;
-	    my ($bestref,$jobs) = _schedule_one_resource($schreq,$resref);
+	    my ($bestref,$jobs) = _schedule_one_resource($schreq,$resref,\%resscratch);
 	    if ($bestref) {
 		_timelog("      Resdn $jobs on ",$bestref->hostname," for $hold->{hold_key}\n") if $Debug;
 		# Hold this resource so next schedule loop doesn't hit it
 		_hold_add_host($hold, $bestref);
+		push @{$resscratch{partial_hosts}}, $bestref;  # For the user
 	    }
 	    if ($hold == $schhold) {   # We're scheduling the one the user asked for
 		$resjobs = $jobs;
@@ -743,10 +761,17 @@ sub _schedule {
     _timelog("DONE_HOLDS:  ",Data::Dumper::Dumper (\%Holds)) if $Debug;
 
     # Return the list of hosts we scheduled
-    return {jobs => $resjobs,
-	    best => ($resdone ? \@reshostnames : undef),
-	    hold => ($resdone ? $schhold : undef),
-	};
+    if ($resdone) {
+	return {jobs => $resjobs,
+		best => \@reshostnames,
+		hold => $schhold,
+	    };
+    } else {
+	return {jobs => $resjobs,
+		best => undef,
+		hold => undef,
+	    };
+    }
 }
 
 ######################################################################
@@ -770,7 +795,7 @@ sub _hold_add_host {
     $hold->{hostnames} ||= [];
     push @{$hold->{hostnames}}, $host->hostname;
     # Not: _holds_adjust, save unnecessary looping and just add the load directly.
-    $host->{dynamic}{adj_load} += $hold->{hold_load};
+    $host->{dynamic}{adj_load} += ($hold->{hold_load}>=0 ? $hold->{hold_load} : $host->cpus);
 }
 
 sub _hold_delete {
@@ -828,7 +853,7 @@ sub _holds_adjust {
 		# then goes down.  It's harmless, as all will be better when it comes back.
 		warn "No host $hostname" if $Debug;
 	    } else {
-		$host->{dynamic}{adj_load} += $hold->{hold_load};
+		$host->{dynamic}{adj_load} += (($hold->{hold_load}>=0) ? $hold->{hold_load} : $host->cpus);
 		push @{$host->{dynamic}{holds}}, $hold;
 	    }
 	}

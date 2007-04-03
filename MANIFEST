@@ -24,7 +24,7 @@ slpolice
 slreportd
 slrsh
 t/00_pod.t
+t/01_manifest.t
 t/10_safe.t
 t/50_test.t
 t/test_utils.pl
-

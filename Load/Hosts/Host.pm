@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm,v 1.49 2006/07/19 13:54:56 wsnyder Exp $
+# $Id: Host.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug $Safer);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 ######################################################################
 #### Globals
@@ -111,6 +111,19 @@ sub host_match {
 	    );
 }
 
+sub host_match_chooser {
+    my $self = $_[0];
+    # Similar to host_match, but for internal use by the chooser - performance critical
+    my $paramref = $_[1];
+    my $scratchref = $_[2];
+    # For use of Hosts::hosts_match
+    return ((!defined $paramref->{classes} || $self->classes_match($paramref->{classes}))
+	    && (!defined $paramref->{match_cb} || $self->eval_match ($paramref->{match_cb}, $scratchref))
+	    && (!defined $paramref->{allow_reserved} || $paramref->{allow_reserved}
+		|| !$self->reserved)
+	    );
+}
+
 sub classes_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
     my $classesref = shift;
@@ -125,15 +138,17 @@ sub classes_match {
 sub eval_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->eval_match(subroutine)';
     my $subref = shift;
+    # @_ are optional arguments
     return 1 if !defined $subref;  # Null reference means match everything
-    return $self->_eval_generic_cb($subref);
+    return $self->_eval_generic_cb($subref,@_);
 }
 
 sub _eval_generic_cb {
     my $self = shift;
     my $subref = shift;
+    # @_ are optional arguments
     # Call &$subref($self) in safe container
-    return $Safer->eval_cb($subref,$self);
+    return $Safer->eval_cb($subref,$self,@_);
 }
 
 ######################################################################

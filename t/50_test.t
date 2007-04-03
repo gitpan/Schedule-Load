@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 50_test.t,v 1.3 2006/03/02 13:01:12 wsnyder Exp $
+#$Id: 50_test.t 73 2006-03-02 13:01:12Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'

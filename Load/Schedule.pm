@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm,v 1.53 2006/07/19 13:54:56 wsnyder Exp $
+# $Id: Schedule.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.040';
+$VERSION = '3.050';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -142,7 +142,7 @@ sub fixed_load {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->fixed_load)';
     my $params = {
 	host=>hostname(),
-	load=>1,
+	load=>1,  # Negative for all cpus
 	uid=>$<,
 	pid=>$$,
 	req_hostname=>hostname(),  # Where to do a pid_exists

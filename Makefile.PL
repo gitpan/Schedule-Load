@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.32 2006/03/02 13:01:11 wsnyder Exp $
+# $Id: Makefile.PL 98 2007-04-03 15:22:10Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -45,10 +45,10 @@ preexist:
 	test ! -r \$(HOME)/src/kits/\$(DISTVNAME).tar.gz
 
 tag:
-	cvs tag -F \$(DISTNAME)_\$(VERSION_SYM) .
+	svnorcvs tag  \$(DISTNAME)_\$(VERSION_SYM)
 
 maintainer-diff:
-	cvs diff -r \$(DISTNAME)_\$(VERSION_SYM) 
+	svnorcvs diff \$(DISTNAME)_\$(VERSION_SYM) 
 
 maintainer-dist: preexist dist tag
 	cp \$(DISTVNAME).tar.gz \$(HOME)/src/kits
@@ -69,11 +69,12 @@ WriteMakefile(
 	      ABSTRACT_FROM => 'Load.pm',
 	      VERSION_FROM  => 'Load.pm',
 	      NO_META	=> 1,
-	      PREREQ_PM => {'Proc::ProcessTable' => 0.40,
-			    'Unix::Processors' => 2.020,
+	      PREREQ_PM => {'IPC::Locker' => 1.410,	# IPC::PidStat, enclosed within
+			    'Proc::ProcessTable' => 0.40,
+			    'Pod::Usage' => 0,
 			    'Storable' => 0,
 			    'Time::HiRes' => 0,
-			    'IPC::Locker' => 1.410,	# IPC::PidStat, enclosed within
+			    'Unix::Processors' => 2.020,
 			},
 	      EXE_FILES	=> [qw( rschedule slchoosed slreportd slpolice slrsh)],
 	      'clean'	=> {FILES => 'test_store', },

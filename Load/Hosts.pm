@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm,v 1.86 2006/07/19 13:54:55 wsnyder Exp $
+# $Id: Hosts.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 ######################################################################
 #### Globals
@@ -231,7 +231,7 @@ sub idle_host_names {
 
 ######################################################################
 ######################################################################
-#### Information printing
+#### Low level prints
 
 sub digit {
     my $host = shift;
@@ -243,11 +243,32 @@ sub digit {
     return $val;
 }
 
+use Time::localtime;
+sub _format_time {
+    my $value = shift || 0;
+    my $t = localtime($value);
+    return sprintf("%04d/%02d/%02d %02d:%02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min,$t->sec);
+}
+
+sub _hostname_width {
+    my $hosts = shift;
+    my $hostwidth = 4;  # For 'HOST' header
+    foreach my $host ( @{$hosts->hosts} ){
+	$hostwidth = length($host->hostname) if $hostwidth < length($host->hostname);
+    }
+    return $hostwidth;
+}
+
+######################################################################
+######################################################################
+#### Information printing
+
 sub print_hosts {
     my $hosts = shift;
     # Overall machine status
     my $out = "";
-    (my $FORMAT =           "%-12s    %4s     %4s   %6s%%       %5s   %6s     %2s    %s\n") =~ s/\s\s+/ /g;
+    my $hwid = _hostname_width($hosts);
+    (my $FORMAT =      "%-${hwid}s   %4s     %4s    %6s%%      %5s     %6s    %2s    %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "RATE", "RL", "ARCH/OS");
     foreach my $host ( @{$hosts->hosts} ){
 	my $ostype = $host->archname ." ". $host->osvers;
@@ -290,7 +311,8 @@ sub print_holds {
 		           code => "P",};
     }
     my $out = "";
-    (my $FORMAT =           "%-10s  %-12s    %5s      %5s   %2s  %1s   %7s    %-12s %-s\n") =~ s/\s\s+/ /g;
+    my $hwid = _hostname_width($hosts);
+    (my $FORMAT =           "%-10s %-${hwid}s %5s    %5s    %2s  %1s   %7s    %-${hwid}s  %-s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "USER", "UHOST", "UPID", "PRI", "L", "S", "WAIT", "ON_HOST", "COMMENT");
     foreach my $key (sort (keys %holdlist)) {
 	my $hold = $holdlist{$key}{hold};
@@ -311,35 +333,31 @@ sub print_holds {
     return $out;
 }
 
-use Time::localtime;
-sub _format_time {
-    my $value = shift || 0;
-    my $t = localtime($value);
-    return sprintf("%04d/%02d/%02d %02d:%02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min,$t->sec);
-}
-
 sub print_status {
     my $hosts = shift;
     # Daemon status, mostly for debugging
     my $out = "";
+    my $hwid = _hostname_width($hosts);
     {
-	(my $FORMAT =           "%-12s     %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
-	$out.=sprintf ($FORMAT, "CHOOSER", "CONNECTED", "DELAY", "DAEMON STATUS");
+	(my $FORMAT =         "%-${hwid}s   %7s       %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
+	$out.=sprintf ($FORMAT, "CHOOSER", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS");
 	$out.=sprintf ($FORMAT,
 		       $hosts->{chooinfo}{slchoosed_hostname},
+		       ($hosts->{chooinfo}{slchoosed_version}||"?"),
 		       _format_time($hosts->{chooinfo}{slchoosed_connect_time}||0),
 		       sprintf("%2.3f",$hosts->{chooinfo}{last_command_delay}||0),
 		       $hosts->{chooinfo}{slchoosed_status});
     }
 
-    (my $FORMAT =           "%-12s  %6s%%     %5s     %6s    %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "CONNECTED", "DELAY", "DAEMON STATUS");
+    (my $FORMAT =     "%-${hwid}s    %6s%%    %5s     %6s     %7s        %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
+    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS");
     foreach my $host ( @{$hosts->hosts} ){
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
 		       sprintf("%2.2f", $host->adj_load),
 		       $host->rating_text,
+		       ($host->get_undef('slreportd_version')||"?"),
 		       _format_time($host->slreportd_connect_time||0),
 		       (defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
 		       $host->slreportd_status,
@@ -352,7 +370,8 @@ sub print_top {
     my $hosts = shift;
     # Top processes
     my $out = "";
-    (my $FORMAT =           "%-12s   %6s    %-10s    %4s    %6s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    my $hwid = _hostname_width($hosts);
+    (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %4s     %6s    %-5s     %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
@@ -377,7 +396,8 @@ sub print_loads {
     my $hosts = shift;
     # Top processes
     my $out = "";
-    (my $FORMAT =           "%-12s   %6s    %-10s   %3s   %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    my $hwid = _hostname_width($hosts);
+    (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %3s    %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NIC", "RUNTM", "CPU","COMMAND"); 
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
@@ -404,7 +424,8 @@ sub print_kills {
 	@_,};
     # Top processes
     my $out = "";
-    (my $FORMAT =           "ssh %-12s kill %s%6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    my $hwid = _hostname_width($hosts);
+    (my $FORMAT =           "ssh %-${hwid}s kill %s%6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     foreach my $host ( @{$hosts->hosts} ){
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
@@ -445,10 +466,15 @@ sub print_classes {
 	$classnum++;
     }
 
+    my $hostwidth = 4;
+    foreach my $host ( @{$hosts->hosts} ){
+	$hostwidth = length($host->hostname) if $hostwidth < length($host->hostname);
+    }
+
     my $classes = $classnum;
     $classnum = 0;
     foreach my $class (@classes) {
-	$out.=sprintf ("%-12s ", ($classnum==$classes-1)?"HOST":"");
+	$out.=sprintf ("%-${hostwidth}s ", ($classnum==$classes-1)?"HOST":"");
 	for (my $prtclassnum = 0; $prtclassnum<$classnum; $prtclassnum++) {
 	    $out .= (" "x$col_width[$prtclassnum])."|";
 	}
@@ -461,7 +487,7 @@ sub print_classes {
 	$classnum++;
     }
     foreach my $host ( @{$hosts->hosts} ){
-	$out .= sprintf "%-12s ", $host->hostname;
+	$out .= sprintf "%-${hostwidth}s ", $host->hostname;
 	$classnum = 0;
 	foreach my $class (@classes) {
 	    my $val = $host->get_undef($class);

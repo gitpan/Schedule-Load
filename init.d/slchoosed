@@ -22,11 +22,20 @@
 ### END INIT INFO
 
 state=$1
+prog=/usr/local/bin/slchoosed
 
 case $state in
-'start')
-        echo starting /usr/local/bin/slchoosed if present
-        [ -f /usr/local/bin/slchoosed ] &&  su daemon -c /usr/local/bin/slchoosed &
+  start)
+	if [ $EUID != 0 ]; then
+	    echo "Run as root, only root can do kill 0's"  
+	    exit 10
+	fi
+        if [ -f $prog ]; then
+            echo starting $prog
+	    su daemon -c $prog &
+	else
+	    echo Service broken, not found: $prog
+	fi
 	exit 0
         ;;
   stop)

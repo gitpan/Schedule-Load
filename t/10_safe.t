@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 10_safe.t,v 1.1 2006/04/10 20:58:16 wsnyder Exp $
+#$Id: 10_safe.t 79 2006-04-10 20:58:16Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 #
 # Copyright 2006-2006 by Wilson Snyder.  This program is free software;

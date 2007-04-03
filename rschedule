@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule,v 1.42 2006/03/02 13:01:11 wsnyder Exp $
+# $Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -18,7 +18,7 @@ require 5.004;
 use lib 'blib/lib';	# testing
 use Getopt::Long;
 use Sys::Hostname;
-use Pod::Text;
+use Pod::Usage;
 use Schedule::Load;
 use Schedule::Load::Schedule;
 use Config;
@@ -57,7 +57,7 @@ if ($0 =~ /(^|[\\\/])rloads$/) {
     push @ARGV, ("loads");
 }
 
-$result = &GetOptions (
+if (!GetOptions (
 		       "help"		=> \&usage,
 		       "debug"		=> \&debug,
 		       "version"	=> \&version,
@@ -71,9 +71,9 @@ $result = &GetOptions (
 		       "allow-reserved!"=> sub {shift; push @match_params, (allow_reserved => shift);},
 		       "similar!"	=> \$opt_similar,
 		       "<>"		=> \&cmd,
-		       );
-
-if (!$result) { &usage(); }
+		 )) {
+    die "%Error: Bad usage, try 'rschedule --help'\n";
+}
 
 push @match_params, (classes=>\@opt_classes);
 if ($opt_similar) {
@@ -228,15 +228,14 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule,v 1.42 2006/03/02 13:01:11 wsnyder Exp $ ', "\n";
-    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
-    pod2text($0);
+    print '$Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule,v 1.42 2006/03/02 13:01:11 wsnyder Exp $ ';
+    print 'Id: $Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $ ';
     print "\n";
     exit (1);
 }
@@ -315,9 +314,9 @@ will show the load report.
 
 =over 4
 
-=item allow_class hostname class
+=item allow_class <class>
 
-Sets the hostname to allow the specified class of jobs.
+Sets the hostname to allow the specified class of jobs.  This sticks across reboots.
 
 =item best
 
@@ -331,17 +330,17 @@ Returns the best host if there are free CPUs laying around, else fails.
 
 Displays a listing of the classes of jobs each host can run.
 
-=item cmnd_comment pid
+=item cmnd_comment <pid>
 
 Sets the command comment for the given process ID.  In rschedule top (rtop)
 displays, this will be shown rather then the name of the command.  Command
 comments are inherited by children of commented parents.
 
-=item deny_class hostname
+=item deny_class <class>
 
 Sets the hostname to deny the specified class of jobs.
 
-=item fixed_load pid
+=item fixed_load <pid>
 
 Sets the given process ID to have that process count as one host load, even
 if it is using less CPU time then that due to high disk activity or other

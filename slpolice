@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: slpolice,v 1.27 2006/04/10 19:04:50 wsnyder Exp $
+# $Id: slpolice 98 2007-04-03 15:22:10Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -15,7 +15,7 @@
 
 require 5.005;
 use IO::File;
-use Pod::Text;
+use Pod::Usage;
 use Getopt::Long;
 use Schedule::Load::Hosts;
 use Time::localtime;
@@ -54,7 +54,7 @@ if (!GetOptions (
 		 "dhost=s"	=> sub {shift; push @{$opt_server_params{dhost}}, split(':',shift);},
 		 "<>"		=> \&parameter,
 		 )) {
-    usage();
+    die "%Error: Bad usage, try 'slpolice --help'\n";
 }
 
 my $scheduler = Schedule::Load::Hosts->fetch(%opt_server_params);
@@ -65,9 +65,8 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice,v 1.27 2006/04/10 19:04:50 wsnyder Exp $ ', "\n";
-    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
-    pod2text($0);
+    print '$Id: slpolice 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 

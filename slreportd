@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $
+# $Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -19,7 +19,7 @@ require 5.004;
 use lib 'blib/lib';	# testing
 use FindBin qw($Script);
 use Getopt::Long;
-use Pod::Text;
+use Pod::Usage;
 use Sys::Syslog;
 use Schedule::Load::Reporter;
 use POSIX;
@@ -47,7 +47,7 @@ my %server_params = ();
 my $opt_quiet = 1;
 my $opt_fork = 1;
 
-Getopt::Long::config ("pass_through", "no_auto_abbrev");
+Getopt::Long::config ("no_auto_abbrev");
 if (!GetOptions (
 		 "help"		=> \&usage,
 		 "debug"	=> \&debug,
@@ -60,7 +60,7 @@ if (!GetOptions (
 		 "stored_filename=s"	=> sub {shift; $server_params{stored_filename} = shift;},
 		 "<>"		=> \&parameter,
 		 )) {
-    &usage();
+    die "%Error: Bad usage, try 'slreportd --help'\n";
 }
 
 autoflush STDOUT 1;
@@ -137,15 +137,14 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $ ', "\n";
-    $SIG{__WARN__} = sub{};	#pod2text isn't clean.
-    pod2text($0);
+    print '$Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd,v 1.36 2006/06/23 13:22:47 wsnyder Exp $ ';
+    print 'Id: $Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $ ';
     print "\n";
     exit (1);
 }

@@ -2,6 +2,17 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.050 4/3/2007
+
+***	Rschedule status now shows version numbers of the daemons.
+
+****	A requested hold_load or fixed_load of -1 indicates 
+	to grab all CPUs on that host.
+
+****	Reduce reporter network traffic under slow response times.
+
+****	Fix --help to use Pod::Usage instead of depreciated pod2text.
+
 * Schedule::Load 3.040 7/19/2006
 
 ***	Added slrsh --summary option.
@@ -10,6 +21,8 @@ The contributors that suggested a given feature are shown in [].
 
 ***	Added reporter load_pctcpu option to counteract low CPU% jobs.
 	When set, Schedule::Load::Host->fixed_load may now return a float.
+
+***	Rschedule loads now includes percent memory usage.
 
 ****	Fake Reporters now include information on the originator of the request.
 
@@ -209,7 +222,7 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes,v 1.24 2006/07/19 13:54:55 wsnyder Exp $
+$Id: Changes 99 2007-04-03 15:35:37Z wsnyder $
 DESCRIPTION: Documentation on change history for this package
 ----------------------------------------------------------------------
 

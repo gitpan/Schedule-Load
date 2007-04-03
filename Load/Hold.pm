@@ -1,4 +1,4 @@
-# $Id: Hold.pm,v 1.18 2006/07/19 13:54:55 wsnyder Exp $
+# $Id: Hold.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 ######################################################################
 #### Creators
@@ -129,6 +129,7 @@ Key for generating and removing the request via Schedule::Load::Schedule.
 =item hold_load
 
 Number of loads to apply, for Schedule::Load::Schedule applications.
+Negative will request all resources on that host.
 
 =item hold_time
 

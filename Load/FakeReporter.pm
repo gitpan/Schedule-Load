@@ -1,5 +1,5 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm,v 1.34 2006/07/19 13:54:55 wsnyder Exp $
+# $Id: FakeReporter.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -26,7 +26,7 @@ use POSIX;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 ######################################################################
 #### Local process table

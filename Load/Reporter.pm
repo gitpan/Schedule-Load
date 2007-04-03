@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm,v 1.69 2006/07/19 13:54:55 wsnyder Exp $
+# $Id: Reporter.pm 99 2007-04-03 15:35:37Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.040';
+$VERSION = '3.050';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -91,6 +91,7 @@ sub start {
     # More defaults (can't be above due to needing other elements)
     $self->{const}{hostname} ||= hostname();
     $self->{const}{slreportd_hostname} ||= hostname();
+    $self->{const}{slreportd_version} ||= $VERSION;
     $self->{stored_filename} ||= ($RSCHLIB."/rschedule/slreportd_".$self->{const}{hostname}."_store");
 
     (defined $self->{dhost}) or croak 'Require a host parameter';
@@ -479,6 +480,7 @@ sub _fixed_load {
     my $load = $params->{load};
     my $pid = $params->{pid};
     print "Fixed load of $load PID $pid\n" if $Debug;
+    $load = $self->{const}{cpus} if $load<0;   # Allow -1 for all CPUs
     $Pid_Inherit{$pid}{fixed_load} = $load;
     $Pid_Inherit{$pid}{pid} = $params->{pid};
     $Pid_Inherit{$pid}{uid} = $params->{uid};
