@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -67,14 +67,10 @@ chdir "/";	# Change immediately to aid debugging of $0 change
 
 if ($opt_quiet && !$Debug) {
     if ($opt_fork) {
-	# Fork once to let parent die
-	exit if fork();
-	# Disassociate from controlling terminal
-        POSIX::setsid();
-	# Prevent possibility of acquiring a controling terminal
-	exit if fork();
-	# Change working directory
-	chdir "/";
+	exit if fork();  # Fork once to let parent die
+        POSIX::setsid(); # Disassociate from controlling terminal
+	exit if fork();  # Prevent possibility of acquiring a controling terminal
+	chdir "/";       # Change working directory so can umount .
     }
     # Close open file descriptors
     my $openmax = POSIX::sysconf( &POSIX::_SC_OPEN_MAX );
@@ -122,14 +118,14 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    print '$Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $ ', "\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed 98 2007-04-03 15:22:10Z wsnyder $ ';
+    print 'Id: $Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $ ';
     print "\n";
     exit (1);
 }
@@ -223,7 +219,7 @@ Wilson Snyder <wsnyder@wsnyder.org>
 
 =head1 SEE ALSO
 
-L<slreportd>, L<Schedule::Load>, L<Schedule::Load::Chooser>
+L<slchoosed_watchd>, L<slreportd>, L<Schedule::Load>, L<Schedule::Load::Chooser>
 
 =cut
 ######################################################################

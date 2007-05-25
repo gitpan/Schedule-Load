@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Load.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -38,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 $Debug = 0;
 
 %_Default_Params = (
@@ -206,7 +206,7 @@ Schedule::Load - Load distribution and status across multiple host machines
   # Get per-host or per top process information
   use Schedule::Load::Hosts;
   my $hosts = Schedule::Load::Hosts->fetch();
-  foreach my $host ($hosts->hosts) {
+  foreach my $host ($hosts->hosts_sorted) {
       printf $host->hostname," is on our network\n";
   }
 

@@ -2,6 +2,20 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.051 5/25/2007
+
+**	Use hold_load so hosts don't exceed their load_limit. [Bryce Denney]
+
+***	Added slchoosed_watchd utility daemon, for detecting slchoosed failures.
+
+***	Added slreportd dynamic_cache_timeout parameter.
+
+****	Documented requirement that match_cb allow caching (vs rating_cb).
+
+****	Made 'rschedule status' DELAY column more consistently accurate.
+
+****	Various performance enhancements.
+
 * Schedule::Load 3.050 4/3/2007
 
 ***	Rschedule status now shows version numbers of the daemons.
@@ -222,7 +236,7 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes 99 2007-04-03 15:35:37Z wsnyder $
+$Id: Changes 111 2007-05-25 14:40:56Z wsnyder $
 DESCRIPTION: Documentation on change history for this package
 ----------------------------------------------------------------------
 

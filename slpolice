@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: slpolice 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: slpolice 104 2007-05-02 14:08:29Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -65,7 +65,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    print '$Id: slpolice 104 2007-05-02 14:08:29Z wsnyder $ ', "\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
@@ -88,7 +88,7 @@ sub gather_loads {
     my $scheduler = shift;
 
     (my $FORMAT =           "%-12s   %6s    %-8s     %4s    %6s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
-    foreach my $host ( @{$scheduler->hosts} ){
+    foreach my $host ($scheduler->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $mach = $host->hostname;
@@ -156,7 +156,7 @@ sub gather_reserveds {
     my $scheduler = shift;
 
     (my $FORMAT =             "%-12s   %-25s  %s\n") =~ s/\s\s+/ /g;
-    foreach my $host ( @{$scheduler->hosts} ){
+    foreach my $host ($scheduler->hosts_sorted) {
 	if ($host->reserved) {
 	    my $ostype = $host->archname ." ". $host->osvers;
 	    $ostype =~ s/enterprise//;

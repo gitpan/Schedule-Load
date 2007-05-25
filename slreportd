@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-# $Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: slreportd 107 2007-05-02 14:53:43Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -72,14 +72,10 @@ chdir "/" if $opt_fork;	# Change immediately to aid debugging of $0 change
 
 if ($opt_quiet && !$Debug) {
     if ($opt_fork) {
-	# Fork once to let parent die
-	exit if fork();
-	# Disassociate from controlling terminal
-        POSIX::setsid();
-	# Prevent possibility of acquiring a controling terminal
-	exit if fork();
-	# Change working directory
-	chdir "/";
+	exit if fork();  # Fork once to let parent die
+        POSIX::setsid(); # Disassociate from controlling terminal
+	exit if fork();  # Prevent possibility of acquiring a controling terminal
+	chdir "/";       # Change working directory so can umount .
     }
     # Close open file descriptors
     my $openmax = POSIX::sysconf( &POSIX::_SC_OPEN_MAX );
@@ -137,14 +133,14 @@ sub parameter {
 ######################################################################
 
 sub usage {
-    print '$Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    print '$Id: slreportd 107 2007-05-02 14:53:43Z wsnyder $ ', "\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slreportd 98 2007-04-03 15:22:10Z wsnyder $ ';
+    print 'Id: $Id: slreportd 107 2007-05-02 14:53:43Z wsnyder $ ';
     print "\n";
     exit (1);
 }
@@ -233,9 +229,26 @@ with specific properties.
 
 =over 4 
 
+=item dynamic_cache_timeout={secs}
+
+When set, after this number of seconds the dynamic load information for
+this host will no longer be cached by slchoosed, and when next needed must
+be reread from the slreportd.  If not set, slchooserd picks a default,
+currently 10 seconds.  Turning this number up may improve performance at
+the cost of decreased accuracy.
+
 =item load_limit={value}
 
 Set a maximum number of jobs that the scheduler can run on this machine.
+
+=item load_pctcpu={1|0}
+
+When set, determine load as a floating point number based on CPU usage
+percentage of all tasks.  Default, or when clear, load is a absolute number
+where each high CPU job counts as one job, regardless of what percentage of
+the CPU is used.  Using pctcpu tends to keep CPUs busy more often, at the
+possible expense of slowing down interactive jobs that are not using an
+entire CPU.
 
 =item rating_adder={value}
 
@@ -247,15 +260,6 @@ rating will make the machine less desirable for scheduling.
 Multiply the specified value to the rating obtained for the machine.  The
 value 2 would act the same as a halved clock frequency, making the machine
 less desirable for scheduling.
-
-=item load_pctcpu={1|0}
-
-When set, determine load as a floating point number based on CPU usage
-percentage of all tasks.  Default, or when clear, load is a absolute number
-where each high CPU job counts as one job, regardless of what percentage of
-the CPU is used.  Using pctcpu tends to keep CPUs busy more often, at the
-possible expense of slowing down interactive jobs that are not using an
-entire CPU.
 
 =back
 

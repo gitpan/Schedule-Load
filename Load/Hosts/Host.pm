@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Host.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -31,7 +31,7 @@ use vars qw($VERSION $AUTOLOAD $Debug $Safer);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 ######################################################################
 #### Globals
@@ -92,7 +92,7 @@ sub get_undef {
 #### Matching
 
 sub host_match {
-    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->classes_match(classesref))';
+    my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->host_match(classesref))';
     # Params can be either a hash reference (for chooser)
     # or a list of parameters (simple user functions)
     my $paramref = $_[0];
@@ -117,8 +117,13 @@ sub host_match_chooser {
     my $paramref = $_[1];
     my $scratchref = $_[2];
     # For use of Hosts::hosts_match
-    return ((!defined $paramref->{classes} || $self->classes_match($paramref->{classes}))
-	    && (!defined $paramref->{match_cb} || $self->eval_match ($paramref->{match_cb}, $scratchref))
+    return ((   !defined $paramref->{classes} || !defined $paramref->{classes}[0]
+		|| _classes_match_chooser($self, $paramref->{classes})
+		)
+	    && (!defined $paramref->{match_cb}
+		#Slow, so inlined:  || $self->eval_match ($paramref->{match_cb}, $scratchref)
+		|| _eval_generic_cb($self, $paramref->{match_cb}, $scratchref)
+		)
 	    && (!defined $paramref->{allow_reserved} || $paramref->{allow_reserved}
 		|| !$self->reserved)
 	    );
@@ -135,10 +140,20 @@ sub classes_match {
     return 0;
 }
 
+sub _classes_match_chooser {
+    my $self = $_[0];
+    my $classesref = $_[1];
+    foreach (@{$classesref}) {
+	return 1 if get_undef($self, $_);
+    }
+    return 0;
+}
+
 sub eval_match {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->eval_match(subroutine)';
     my $subref = shift;
     # @_ are optional arguments
+    # See inlined version in host_match_chooser
     return 1 if !defined $subref;  # Null reference means match everything
     return $self->_eval_generic_cb($subref,@_);
 }
@@ -221,6 +236,15 @@ sub rating {
     my $subref = shift;
     return $self->rating_cb() if !defined $subref;  # Null reference means default callback
     return $self->_eval_generic_cb($subref);
+}
+
+sub rating_chooser {
+    # Similar to rating, but for internal use by the chooser - performance critical
+    my $self = $_[0];
+    my $subref = $_[1];
+    my $scratchref = $_[2];
+    return $self->rating_cb() if !defined $subref;  # Null reference means default callback
+    return $self->_eval_generic_cb($subref, $scratchref);
 }
 
 sub rating_text {

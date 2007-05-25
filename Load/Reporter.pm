@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Reporter.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -83,7 +83,7 @@ sub start {
 	#Documented
 	#Undocumented
 	timeout=>$Debug?2:30,		# Sec before host socket connect times out
-	alive_time=>$Debug?10:30,	# Sec to send alive message
+	alive_time=>$Debug?10:30,	# Sec to send alive message (must be sooner then Chooser's ping_dead_time)
 	const_changed=>0,		# const or stored has changed, update in chooser
 	@_};
     bless $self, $class;

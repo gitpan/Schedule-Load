@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Chooser.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -48,7 +48,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -78,11 +78,11 @@ sub start {
     my $self = {
 	%Schedule::Load::_Default_Params,
 	#Documented
-	cache_time=>10,	# Secs to hold cache for
-	dead_time=>45,	# Secs lack of ping indicates dead
-	subchooser_restart_num=>12,		# For first 12 times,
-	subchooser_first_time=>20,		# Sec between first 12 chooser_restart_if_reporters
-	subchooser_repeat_time=>(10*60),	# Sec between other chooser_restart_if_reporters
+	dynamic_cache_timeout=>10,	# Secs to hold cache for, if not set differently by reporter
+	ping_dead_timeout=>90,		# Secs lack of ping indicates dead (greater than reporter's alive_time)
+	subchooser_restart_num=>12,	# For first 12 times,
+	subchooser_first_time=>20,	# Sec between first 12 chooser_restart_if_reporters
+	subchooser_repeat_time=>(5*60),	# Sec between other chooser_restart_if_reporters
 	@_,};
     bless $self, $class;
     $Server_Self = $self;	# Only should be one... Need some options
@@ -122,8 +122,8 @@ sub start {
 		# new Client
 		my $client = {socket=>$clientfh,
 			      delayed=>0,
-			      ping => $Time,
-			      last_send_time => undef,
+			      ping_time => $Time,
+			      last_reqdyn_time => undef,
 			  };
 		$Clients{$clientfh} = $client;
 	    }
@@ -282,13 +282,8 @@ sub _client_service {
 	return;
     }
 
-    if ($client->{last_send_time} && $client->{host}) {
-	my $sec  = $Time - $client->{last_send_time}[0];
-	my $usec =  $Time_Usec - $client->{last_send_time}[1];
-	$client->{host}{const}{slreportd_delay} = $sec + $usec * 1.0e-6;
-    }
     $client->{inbuffer} .= $data;
-    $client->{ping} = $Time;
+    $client->{ping_time} = $Time;
 
     while ($client->{inbuffer} =~ s/^([^\n]*)\n//) {
 	next if $client->{_broken};
@@ -308,8 +303,13 @@ sub _client_service {
 	    _host_dynamic ($client, "stored", $params);
 	} elsif ($cmd eq "report_dynamic") {
 	    _host_dynamic ($client, "dynamic", $params);
-	    $client->{host}{ping_update} = $Time;
-	    $client->{host}{ping_pending} = 0;
+	    $client->{host}{_dyn_update} = $Time;
+	    $client->{host}{_reqdyn_pending} = 0;
+	    if ($client->{last_reqdyn_time}) {
+		my $sec  = $Time - $client->{last_reqdyn_time}[0];
+		my $usec =  $Time_Usec - $client->{last_reqdyn_time}[1];
+		$client->{host}{const}{slreportd_delay} = $sec + $usec * 1.0e-6;
+	    }
 	    _user_done_finish ($client->{host});
 	}
 	# User commands
@@ -336,7 +336,7 @@ sub _client_service {
 	    exit(0);
 	} elsif ($cmd eq "chooser_restart_if_reporters") {
 	    # Used by master chooser to restart subservient chooser
-	    foreach my $host ($Hosts->hosts, (values %Clients)) {
+	    foreach my $host ($Hosts->hosts_unsorted, (values %Clients)) {
 		next if $host eq $client;   # Skip the requestor itself
 		# Overall fork loop will deal with it.
 		warn "-Info: chooser_restart_if_reporters\n" if $Debug;
@@ -359,7 +359,6 @@ sub _client_send {
 
     $SIG{PIPE} = 'IGNORE';
 
-    $client->{last_send_time} = [$Time, $Time_Usec];
     my $fh = $client->{socket};
     my $ok = Schedule::Load::Socket::send_and_check($fh, $out);
     if (!$ok) {
@@ -372,8 +371,8 @@ sub _client_send {
 sub _client_ping_timecheck {
     # See if any clients haven't pinged
     foreach my $client (values %Clients) {
-	#print "Ping Check $client->{ping} Now $Time  Dead $Server_Self->{dead_time}\n" if $Debug;
-	if ($client->{host} && ($client->{ping} < ($Time - $Server_Self->{dead_time}))) {
+	#print "Ping Check $client->{ping_time} Now $Time  Dead $Server_Self->{ping_dead_timeout}\n" if $Debug;
+	if ($client->{host} && ($client->{ping_time} < ($Time - $Server_Self->{ping_dead_timeout}))) {
 	    _timelog("Client hasn't pinged lately, disconnecting\n") if $Debug;
 	    _client_close ($client);
 	}
@@ -397,7 +396,6 @@ sub _host_start {
     my $host = {  client => $client,
 		  hostname => $hostname,
 		  waiters => {},
-		  ping => 0,
 		  const => $params,
 	      };
     bless $host, "Schedule::Load::Hosts::Host";
@@ -460,7 +458,7 @@ sub _user_to_reporter {
 
     if ($hostnames eq '-all') {
 	my @hostnames = ();
-	foreach my $host ($Hosts->hosts) {
+	foreach my $host ($Hosts->hosts_unsorted) {
 	    push @hostnames, $host->hostname;
 	}
 	$hostnames = \@hostnames;
@@ -469,8 +467,8 @@ sub _user_to_reporter {
     foreach my $hostname (@{$hostnames}) {
 	my $host = $Hosts->{hosts}{$hostname};
 	next if !$host;
-	$host->{ping_update} = 0;	# Kill cache, will need refresh
-	$host->{ping_pending} = 0;	# Kill cache, will need refresh
+	$host->{_dyn_update} = 0;	# Kill cache, will need refresh
+	$host->{_reqdyn_pending} = 0;	# Kill cache, will need refresh
 	_timelog("_user_to_reporter ->$hostname $cmd") if $Debug;
 	_client_send ($host->{client}, $cmd);
     }
@@ -499,22 +497,26 @@ sub _user_send_done_cb {
 sub _user_all_hosts_cmd {
     my $userclient = shift;
     my $cmd = shift;
-    foreach my $host ($Hosts->hosts) {
+    foreach my $host ($Hosts->hosts_unsorted) {
  	_timelog("GET ->", $host->hostname, " $cmd") if $Debug;
-	if ($host->{ping_update} > ($Time - $Server_Self->{cache_time})) {
+	my $dynto = ($host->get_undef('dynamic_cache_timeout') || $Server_Self->{dynamic_cache_timeout});
+	if ($host->{_dyn_update} > ($Time - $dynto)) {
 	    _timelog("    skipping: _cached ",$host->hostname,"\n") if $Debug;
 	} else {
 	    # Cache is out of date.
-	    if ($host->{ping_pending}  # Otherwise only issue one request, it'll satisfy everyone.
-		&& $host->{ping_pending} > ($Time - $Server_Self->{dead_time})) { # Recent
+	    if ($host->{_reqdyn_pending}  # Otherwise only issue one request, it'll satisfy everyone.
+		&& $host->{_reqdyn_pending} > ($Time - $Server_Self->{ping_dead_timeout})) { # Recent
 		# Already issued response, but haven't gotten it, wait for existing request
-		_timelog("    skipping: _ping_pending ",$host->hostname,"\n") if $Debug;
+		_timelog("    skipping: _reqdyn_pending ",$host->hostname,"\n") if $Debug;
 		_user_done_mark ($host, $userclient);
 	    } else {
+		if ($cmd =~ /report_get_dynamic/) {
+		    $host->{client}{last_reqdyn_time} = [$Time, $Time_Usec]; # For DELAY column
+		}
 		if (_client_send ($host->{client}, $cmd)) {
 		    # Mark that we need activity from each of these before being done
 		    _user_done_mark ($host, $userclient);
-		    $host->{ping_pending} = $Time;
+		    $host->{_reqdyn_pending} = $Time;
 		} # Else host down; ignore it
 	    }
 	}
@@ -540,7 +542,7 @@ sub _user_send_type {
     my $type = shift;
     # Send specific data type to user
     my @frozen;
-    foreach my $host ($Hosts->hosts) {
+    foreach my $host ($Hosts->hosts_sorted) {
 	if (defined $host->{$type}) {
 	    #_timelog("Host $host name $host->{hostname}\n") if $Debug;
 	    my %params = (table => $host->{$type},
@@ -633,7 +635,7 @@ sub _schedule_one_resource {
     #Factors:
     #  hosts_match:  reserved, match_cb, classes
     #	   -> Things that absolutely must be correct to schedule here
-    #  rating:	     load_limit, cpus, clock, adj_load, tot_pctcpu, rating_adder, rating_mult
+    #  rating:	     rating_cb:  load_limit, cpus, clock, adj_load, tot_pctcpu, rating_adder, rating_mult
     #	   -> How to prioritize, if 0 it's overbooked
     #  loads_avail:  holds, fixed_load
     #	   -> How many more jobs host can take before we should turn off new jobs
@@ -650,13 +652,14 @@ sub _schedule_one_resource {
     my $freecpus = 0;
     my $totcpus = 0;
     # hosts_match can be slow, plus it constructs a list.  It's faster to loop here.
-    foreach my $host ($Hosts->hosts) {
+    foreach my $host ($Hosts->hosts_sorted) {
 	# host_match takes: classes, match_cb, allow_reserved
+	# we can remove $resscratch from here when code migrates to use rating_cb instead
 	next if !$host->host_match_chooser($resreq,$resscratch);
 	# Process the host
 	$totcpus += $host->cpus;
-	my $rating = $host->rating ($resreq->{rating_cb});
-	_timelog("\tTest host ", $host->hostname," rate $rating, cpus ",$host->cpus,", free ",$host->free_cpus,"\n") if $Debug;
+	my $rating = $host->rating_chooser ($resreq->{rating_cb},$resscratch);
+	_timelog("\tTest host ", $host->hostname," rate ",$rating,", cpus ",$host->cpus,", free ",$host->free_cpus,"\n") if $Debug;
 	#_timelog("\t     adj_load ",$host->adj_load,", load_limit ",$host->load_limit,"\n") if $Debug;
 	#_timelog(Data::Dumper->Dump([$host], ['host']),"\n") if $Debug;
 	if ($rating > 0) {
@@ -734,17 +737,36 @@ sub _schedule {
 	foreach my $resref (@{$schreq->{resources}}) {
 	    _timelog("    Ressch for $hold->{hold_key}\n") if $Debug;
 	    my ($bestref,$jobs) = _schedule_one_resource($schreq,$resref,\%resscratch);
+	    my $okref = $bestref;
 	    if ($bestref) {
-		_timelog("      Resdn $jobs on ",$bestref->hostname," for $hold->{hold_key}\n") if $Debug;
+		# Found at least one CPU slot for this job
+		_timelog("      Resdn   $jobs on ",$bestref->hostname," for $hold->{hold_key}\n") if $Debug;
+		# We may have only gotten a single free CPU out of many wanted.
+		# If this requires much tweaking, we'll make it a callback insted.
+		if (my $limit = $bestref->get_undef('load_limit')) {
+		    my $wantload = _hold_load_host_adjusted($hold,$bestref);
+		    if (($limit - $bestref->adj_load) < $wantload) {
+			_timelog("        **Not all CPUs ready on ",$bestref->hostname
+				 ," (($limit-",$bestref->adj_load,")<$wantload),"
+				 ," for $hold->{hold_key}\n") if $Debug;
+			$okref = undef;
+		    }
+		}
 		# Hold this resource so next schedule loop doesn't hit it
 		_hold_add_host($hold, $bestref);
-		push @{$resscratch{partial_hosts}}, $bestref;  # For the user
+		$bestref = undef;  # Don't use bestref below, use okref
+	    }
+	    if ($okref) {
+		# Found all the needed loads to complete this resource request
+		push @{$resscratch{partial_hosts}}, $okref;  # For the user's rating_cb
 	    }
 	    if ($hold == $schhold) {   # We're scheduling the one the user asked for
 		$resjobs = $jobs;
-		if ($bestref) {
-		    push @reshostnames, $bestref->hostname;
-		} else {  # None found, we didn't schedule anybody...
+		if ($okref) {
+		    push @reshostnames, $okref->hostname;
+		} else {
+		    # None found, we didn't schedule all resources it wanted
+		    # Note there may be other resources it wants, so continue the loop...
 		    $resdone = 0;
 		}
 	    }
@@ -795,7 +817,13 @@ sub _hold_add_host {
     $hold->{hostnames} ||= [];
     push @{$hold->{hostnames}}, $host->hostname;
     # Not: _holds_adjust, save unnecessary looping and just add the load directly.
-    $host->{dynamic}{adj_load} += ($hold->{hold_load}>=0 ? $hold->{hold_load} : $host->cpus);
+    $host->{dynamic}{adj_load} += _hold_load_host_adjusted($hold,$host);
+}
+
+sub _hold_load_host_adjusted {
+    my $hold = shift;
+    my $host = shift;
+    return (($hold->{hold_load}>=0) ? $hold->{hold_load} : $host->cpus);
 }
 
 sub _hold_delete {
@@ -838,7 +866,7 @@ sub _holds_adjust {
     _timelog("HOLDS:  ",Data::Dumper::Dumper (\%Holds)) if $Debug;
 
     # Reset adjusted loads
-    foreach my $host ($Hosts->hosts) {
+    foreach my $host ($Hosts->hosts_unsorted) {
 	$host->{dynamic}{adj_load} = $host->{dynamic}{report_load};
 	$host->{dynamic}{holds} = [];
     }
@@ -853,7 +881,7 @@ sub _holds_adjust {
 		# then goes down.  It's harmless, as all will be better when it comes back.
 		warn "No host $hostname" if $Debug;
 	    } else {
-		$host->{dynamic}{adj_load} += (($hold->{hold_load}>=0) ? $hold->{hold_load} : $host->cpus);
+		$host->{dynamic}{adj_load} += _hold_load_host_adjusted($hold,$host);
 		push @{$host->{dynamic}{holds}}, $hold;
 	    }
 	}
@@ -949,7 +977,7 @@ Starts the chooser daemon.  Does not return.
 The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 /etc/services, else 1752.
 
-=item dead_time
+=item ping_dead_timeout
 
 Seconds after which if a client doesn't respond to a ping, it is considered
 dead.

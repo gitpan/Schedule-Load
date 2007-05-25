@@ -1,0 +1,229 @@
+#!/usr/bin/perl
+# $Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $
+######################################################################
+#
+# Copyright 2000-2007 by Wilson Snyder <wsnyder@wsnyder.org>.  This
+# program is free software; you can redistribute it and/or modify it under
+# the terms of either the GNU Lesser General Public License or the Perl
+# Artistic License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+######################################################################
+
+use lib 'blib/lib';	# testing
+
+use Cwd;
+use FindBin qw($RealBin $RealScript $Script);
+use Getopt::Long;
+use IO::File;
+use Pod::Usage;
+use Proc::ProcessTable;
+use Sys::Syslog;
+
+use Schedule::Load;
+use Schedule::Load::Schedule;
+use strict;
+use vars qw ($Debug $Restart_Cmd);
+
+BEGIN { $ENV{PATH} = '/usr/ucb:/bin:/usr/bin' }	# Secure path
+$SIG{PIPE} = 'IGNORE';
+
+$Restart_Cmd = "/etc/init.d/slchoosed restart";
+
+######################################################################
+
+my $opt_fork = 1;
+my $opt_period;
+my $opt_timeout = 120;
+
+autoflush STDOUT 1;
+autoflush STDERR 1;
+Getopt::Long::config ("no_auto_abbrev");
+if (! GetOptions (
+		  "help"	=> \&usage,
+		  "debug"	=> \&debug,
+		  "version"	=> \&version,
+		  "fork!"	=> \$opt_fork,	# Debugging/Test script
+		  "period=i"	=> \$opt_period,
+		  "timeout=i"	=> \$opt_timeout,
+		  )) {
+    die "%Error: Bad usage, try 'slchoosed_watchd --help'\n";
+}
+$opt_period ||= ($Debug ? 5 : 600);
+
+# We're chdiring to /, so make sure program name has path
+if ($0 !~ m!^/!) { $0 = getcwd()."/".$0; }
+chdir "/";	# Change immediately to aid debugging of $0 change
+
+if (!$Debug) {
+    if ($opt_fork) {
+	exit if fork();  # Fork once to let parent die
+        POSIX::setsid(); # Disassociate from controlling terminal
+	exit if fork();  # Prevent possibility of acquiring a controling terminal
+	chdir "/";       # Change working directory so can umount .
+    }
+    # Close open file descriptors
+    my $openmax = POSIX::sysconf( &POSIX::_SC_OPEN_MAX );
+    $openmax = (!defined($openmax) || $openmax < 0) ? 64 : $openmax;
+    foreach my $i (0 .. $openmax) { POSIX::close($i); }
+    # Silence please (in case user didn't pipe when starting us)
+    open(STDIN,  "+>/dev/null");
+    open(STDOUT, "+>&STDIN");
+    open(STDERR, "+>&STDIN");
+}
+
+# Loop in case something kills us
+while (1) {
+    print "Starting server: $Script\n" if $Debug;
+    if (!$Debug) {
+	openlog($Script, 'cons,pid', 'daemon');
+	syslog('info', 'Started');
+	closelog();
+    }
+
+    my $pid;
+    if (0==($pid = fork())) {
+	while (1) {
+	    sleep ($opt_period);  # Sleep first, so there isn't a race at first startup
+	    ok_or_kill(timeout=>$opt_timeout);
+	}
+	exit(0);
+    }
+    die "%Error: Server aborted\n" if !$opt_fork;
+    waitpid($pid,0);
+}
+
+#----------------------------------------------------------------------
+
+sub usage {
+    print '$Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $ ', "\n";
+    pod2usage(-verbose=>2, -exitval => 2);
+    exit(1);
+}
+
+sub version {
+    print "Version: $Schedule::Load::VERSION\n";
+    print 'Id: $Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $ ';
+    print "\n";
+    exit (1);
+}
+
+sub debug {
+    $Debug = 1;
+    $Schedule::Load::Chooser::Debug = 1;
+}
+
+######################################################################
+
+sub ok_or_kill {
+    my %params = (#timeout=>
+		  @_);
+
+    if (!slchoosed_up(%params)) {
+	print "Chooser looks sick..\n" if $Debug;
+	if (!$Debug) {
+	    openlog($Script, 'cons,pid', 'daemon');
+	    syslog('warning', "slchoosed_watchd restarted slchoosed after $params{timeout} sec hang");
+	    closelog();
+	}
+
+	print "\t$Restart_Cmd\n" if $Debug;
+	system($Restart_Cmd);
+    }
+}
+
+
+sub slchoosed_up {
+    my %params = (#timeout=>
+		  @_);
+    my $ok;
+    eval {
+	print "Contacting slchoosed...\n" if $Debug;
+	local $SIG{ALRM} = sub { die "Timeout\n"; };
+	alarm($params{timeout});
+
+	# Always run on the local machine, even if it is in standby to a different slchoosed.
+	my $scheduler = Schedule::Load::Schedule->fetch(dhost=>'localhost');
+	# Make sure we fetch the host list.  It may be empty though.
+	$scheduler->hosts;
+	print "   slchoosed reached.\n" if $Debug;
+	$ok = 1;
+
+	alarm(0);
+    };
+
+    alarm(0) if $@;
+    return $ok;
+}
+
+######################################################################
+__END__
+
+=pod
+
+=head1 NAME
+
+slchoosed_watchd - Make sure the slchoosed stays up
+
+=head1 SYNOPSIS
+
+B<slchoosed_watchd>
+[ B<--help> ]
+
+=head1 DESCRIPTION
+
+slchoosed_watchd will periodically ask the slchoosed server for
+information, and if it does not respond, restart it.  This is rarely
+needed, as slchoosed is fairly standard, but provides another level of
+assurance for critical applications.
+
+=head1 ARGUMENTS
+
+=over 4
+
+=item --help
+
+Displays this message and program version and exits.
+
+=item --nofork
+
+For debugging, prevents the daemon from creating additional processes and
+from going into the background.  This allows messages to appear on stdout,
+and ctrl-C to stop the daemon.
+
+=item --period I<secs>
+
+Specify the period in seconds between scheduler requests.  The default is 10 minutes.
+
+=item --timeout I<secs>
+
+Specify the longest acceptable delay in seconds.
+
+=item --version
+
+Displays program version and exits.
+
+=back
+
+=head1 DISTRIBUTION
+
+The latest version is available from CPAN and from L<http://www.veripool.com/>.
+
+Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License or the Perl Artistic License.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@wsnyder.org>
+
+=head1 SEE ALSO
+
+L<slchoosed>, L<Schedule::Load>
+
+=cut
+######################################################################

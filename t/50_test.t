@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 50_test.t 73 2006-03-02 13:01:12Z wsnyder $
+#$Id: 50_test.t 104 2007-05-02 14:08:29Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -229,7 +229,7 @@ sub testclass {
 sub testeval {
     my $subref = shift;
     my $n = 0;
-    foreach my $host ( @{$scheduler->hosts} ){
+    foreach my $host ($scheduler->hosts_sorted) {
 	if ($host->eval_match($subref)) {
 	    printf "  %s", $host->hostname;
 	    $n++;

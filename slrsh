@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: slrsh 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: slrsh 104 2007-05-02 14:08:29Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -81,7 +81,7 @@ sub parameter {
 }
 
 sub usage {
-    print '$Id: slrsh 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    print '$Id: slrsh 104 2007-05-02 14:08:29Z wsnyder $ ', "\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
@@ -94,7 +94,7 @@ sub gather_host_lists {
     my $hosts = Schedule::Load::Hosts->fetch(@params);
 
     my @classes = (sort ($hosts->classes()));
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	push @{$Host_Lists{ALL}}, $host->hostname;
 	push @{$Host_Lists{uc $host->archname}}, $host->hostname;
 	push @{$Host_Lists{uc $host->osvers}}, $host->hostname;

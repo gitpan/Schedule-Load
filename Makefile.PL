@@ -1,4 +1,4 @@
-# $Id: Makefile.PL 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: Makefile.PL 103 2007-05-01 19:58:01Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -76,7 +76,7 @@ WriteMakefile(
 			    'Time::HiRes' => 0,
 			    'Unix::Processors' => 2.020,
 			},
-	      EXE_FILES	=> [qw( rschedule slchoosed slreportd slpolice slrsh)],
+	      EXE_FILES	=> [qw( rschedule slchoosed slchoosed_watchd slreportd slpolice slrsh)],
 	      'clean'	=> {FILES => 'test_store', },
 	      'dist'	=> {COMPRESS => 'gzip -9f',
 			    SUFFIX   => '.gz', 

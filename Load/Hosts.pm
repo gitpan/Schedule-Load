@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Hosts.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 ######################################################################
 #### Globals
@@ -104,15 +104,25 @@ sub _chooser_close_all {
 
 sub hosts {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
-    # Return all hosts
-
-    $self->_fetch_if_unfetched;
-    my @keys;
-    foreach my $host (values %{$self->{hosts}}) {
-	push @keys, $host if ($host->exists('hostname') && $host->hostname);
-    }
-    @keys = (sort {$a->hostname cmp $b->hostname} @keys);
+    # Return all hosts - for backward compatibility this is is a sorted accessor
+    my @keys = $self->hosts_sorted;
     return (wantarray ? @keys : \@keys);
+}
+
+sub hosts_sorted {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
+    # Return all hosts
+    $self->_fetch_if_unfetched;
+    # For speed, we're avoiding the hostname accessor.  Generally don't do this.
+    return (sort {$a->{const}{hostname} cmp $b->{const}{hostname}}  # $a->hostname cmp $b->hostname
+	    values %{$self->{hosts}});
+}
+
+sub hosts_unsorted {
+    my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts()';
+    # Return all hosts
+    $self->_fetch_if_unfetched;
+    return (values %{$self->{hosts}});
 }
 
 sub hosts_match {
@@ -124,7 +134,7 @@ sub hosts_match {
     # Return all hosts matching parameters
     $self->_fetch_if_unfetched;
     my @keys;
-    foreach my $host ($self->hosts) {
+    foreach my $host ($self->hosts_sorted) {
 	push @keys, $host if $host->host_match(%params);
     }
     return (wantarray ? @keys : \@keys);
@@ -154,7 +164,7 @@ sub classes {
 
     my %classes = ();
     $self->_fetch_if_unfetched;
-    foreach my $host ( @{$self->hosts} ){
+    foreach my $host ($self->hosts_sorted) {
 	foreach (sort ($host->fields)) {
 	    # Ignore classes that are set to 0
 	    $classes{$_} = 1 if /^class_/ && $host->get($_);
@@ -253,7 +263,7 @@ sub _format_time {
 sub _hostname_width {
     my $hosts = shift;
     my $hostwidth = 4;  # For 'HOST' header
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	$hostwidth = length($host->hostname) if $hostwidth < length($host->hostname);
     }
     return $hostwidth;
@@ -270,7 +280,7 @@ sub print_hosts {
     my $hwid = _hostname_width($hosts);
     (my $FORMAT =      "%-${hwid}s   %4s     %4s    %6s%%      %5s     %6s    %2s    %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "RATE", "RL", "ARCH/OS");
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	my $ostype = $host->archname ." ". $host->osvers;
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
 	$out.=sprintf ($FORMAT,
@@ -293,7 +303,7 @@ sub print_holds {
     # Holding commands
     my %holdlist;
     my $i=0;
-    foreach my $host ($hosts->hosts) {
+    foreach my $host ($hosts->hosts_sorted) {
 	foreach my $hold ($host->holds) {
 	    $i++;
 	    my $key = $hold->req_user."_".$hold->req_hostname."_".$hold->req_pid
@@ -351,7 +361,7 @@ sub print_status {
 
     (my $FORMAT =     "%-${hwid}s    %6s%%    %5s     %6s     %7s        %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS");
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	$out.=sprintf ($FORMAT,
 		       $host->hostname, 
 		       sprintf("%3.1f", $host->total_pctcpu), 
@@ -373,7 +383,7 @@ sub print_top {
     my $hwid = _hostname_width($hosts);
     (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %4s     %6s    %-5s     %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"); 
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    next if ($p->pctcpu < $hosts->{min_pctcpu});
@@ -399,7 +409,7 @@ sub print_loads {
     my $hwid = _hostname_width($hosts);
     (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %3s    %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
     $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NIC", "RUNTM", "CPU","COMMAND"); 
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
@@ -426,7 +436,7 @@ sub print_kills {
     my $out = "";
     my $hwid = _hostname_width($hosts);
     (my $FORMAT =           "ssh %-${hwid}s kill %s%6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
@@ -456,7 +466,7 @@ sub print_classes {
     foreach my $class (@classes) {
 	$class_letter{$class} = chr($classnum%26+ord("a"));
 	$col_width[$classnum] = 1;
-	foreach my $host ( @{$hosts->hosts} ){
+	foreach my $host ($hosts->hosts_sorted) {
 	    my $val = $host->get_undef($class);
 	    if ($val) {
 		$col_width[$classnum] = length $val if $col_width[$classnum] < length $val;
@@ -467,7 +477,7 @@ sub print_classes {
     }
 
     my $hostwidth = 4;
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	$hostwidth = length($host->hostname) if $hostwidth < length($host->hostname);
     }
 
@@ -486,7 +496,7 @@ sub print_classes {
 	$out.=sprintf ("- %s\n", $class);
 	$classnum++;
     }
-    foreach my $host ( @{$hosts->hosts} ){
+    foreach my $host ($hosts->hosts_sorted) {
 	$out .= sprintf "%-${hostwidth}s ", $host->hostname;
 	$classnum = 0;
 	foreach my $class (@classes) {
@@ -688,7 +698,7 @@ Schedule::Load::Hosts - Return host loading information across a network
     my $hosts = Schedule::Load::Hosts->fetch();
     (my $FORMAT =    "%-12s    %4s     %4s   %6s%%       %5s    %s\n") =~ s/\s\s+/ /g;
     printf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "ARCH/OS");
-    foreach my $host ($hosts->hosts) {
+    foreach my $host ($hosts->hosts_sorted) {
 	printf STDOUT ($FORMAT,
 		       $host->hostname, 
 		       $host->cpus_slash, 
@@ -702,7 +712,7 @@ Schedule::Load::Hosts - Return host loading information across a network
     # Top processes
     (my $FORMAT =    "%-12s   %6s    %-10s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
     printf ($FORMAT, "HOST", "PID", "USER",  "STATE", "RUNTM", "CPU","COMMAND"); 
-    foreach my $host ($hosts->hosts) {
+    foreach my $host ($hosts->hosts_sorted) {
 	foreach $p ($host->top_processes) {
 	    printf($FORMAT, 
 		   $host->hostname,
@@ -719,24 +729,35 @@ from many machines across a entire network.
 
 =over 4 
 
-=item fetch ()
+=item $self->fetch ()
 
 Fetch the data structures from across the network.  This also creates
 a new object.  Accepts the port and host parameters.
 
-=item restart ()
+=item $self->restart ()
 
 Restart all daemons, loading their code from the executables again.  Use
 sparingly.  chooser parameter if true (default) restarts chooser, reporter
 parameter if true (default) restarts reporter.
 
-=item hosts ()
+=item $self->hosts ()
 
-Returns the host objects, accessible with L<Schedule::Load::Hosts::Host>.
-In an array context, returns a list; In a a scalar context, returns a
-reference to a list.
+Returns the host objects in name sorted order, accessible with
+L<Schedule::Load::Hosts::Host>.  In an array context, returns a list; In a
+a scalar context, returns a reference to a list.  This function is
+historical, using hosts_sorted or hosts_unsorted is faster.
 
-=item hosts_match (...)
+=item $self->hosts_sorted ()
+
+Returns array of host objects in name sorted order, accessible with
+L<Schedule::Load::Hosts::Host>.
+
+=item $self->hosts_unsorted ()
+
+Returns array of host objects in unsorted order, accessible with
+L<Schedule::Load::Hosts::Host>.
+
+=item $self->hosts_match (...)
 
 Returns L<Schedule::Load::Hosts::Host> objects for every host that matches
 the specified criteria.  Criteria are named parameters, as described in
@@ -744,42 +765,42 @@ Schedule::Load::Schedule, of the following: classes specifies an arrayref
 of allowed classes.  match_cb is a routine returning true if this host
 matches.  allow_reserved=>0 disables returning of reserved hosts.
 
-=item idle_host_names (...)
+=item $self->idle_host_names (...)
 
 Returns a list of host cpu names which are presently idle.  Multiple
 free CPUs on a given host will result in that name being returned multiple
 times.
 
-=item ping
+=item $self->ping
 
 Return true if the slchoosed server is up.
 
-=item get_host ($hostname)
+=item $self->get_host ($hostname)
 
 Returns a reference to a host object with the specified hostname,
 or undef if not found.
 
-=item classes ()
+=item $self->classes ()
 
 Returns all class_ variables under all hosts.  In an array context, returns
 a list; In a a scalar context, returns a reference to a list.
 
-=item print_classes
+=item $self->print_classes
 
 Returns a string with the list of machines and classes that may run on them
 in a printable format.
 
-=item print_hosts
+=item $self->print_hosts
 
 Returns a string with the list of host machines and loading in a printable
 format.
 
-=item print_top
+=item $self->print_top
 
 Returns a string with the top jobs on all machines in a printable format,
 ala the L<top> program.
 
-=item print_loads
+=item $self->print_loads
 
 Returns a string with the top jobs command lines, including any jobs with
 a fixed loading.

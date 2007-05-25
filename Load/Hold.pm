@@ -1,4 +1,4 @@
-# $Id: Hold.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: Hold.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 ######################################################################
 #### Creators
@@ -65,9 +65,10 @@ sub req_age { return (time() - $_[0]->req_time); }
 sub compare_pri_time {
     # Sort comparison for ordering requests
     # This must return a consistent order, thus the hold_key is required as part of the compare.
-    return ($_[0]->req_pri <=> $_[1]->req_pri
-	    || $_[0]->req_time <=> $_[1]->req_time
-	    || $_[0]->hold_key cmp $_[1]->hold_key);
+    # For speed this doesn't use accessors - generally don't do this.
+    return ($_[0]->{req_pri} <=> $_[1]->{req_pri}
+	    || $_[0]->{req_time} <=> $_[1]->{req_time}
+	    || $_[0]->{hold_key} cmp $_[1]->{hold_key});
 }
 
 ######################################################################

@@ -1,4 +1,4 @@
-# $Id: ResourceReq.pm 99 2007-04-03 15:35:37Z wsnyder $
+# $Id: ResourceReq.pm 111 2007-05-25 14:40:56Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.050';
+$VERSION = '3.051';
 
 ######################################################################
 #### Creators
@@ -149,9 +149,11 @@ will keep at least 50% of all CPUsidle.  Defaults to 0.
 =item match_cb
 
 A string containing a subroutine which will be passed a host reference and
-should return true if this host has the necessary properties.  This will be
-evaluated in a Safe container, and can do only minimal core functions.  For
-example: match_cb=>"sub{return $_[0]->get_undef('memory')>512;}"
+should return true if this host has the necessary properties.  This must
+only look at constant properties of the host (IE NOT the current host
+loading), as the match results may be cached.  This will be evaluated in a
+Safe container, and can do only minimal core functions.  For example:
+match_cb=>"sub{return $_[0]->get_undef('memory')>512;}"
 
 =item max_jobs
 
@@ -164,7 +166,8 @@ of the clump.
 
 A string containing a subroutine which will be passed a host reference and
 should return a number that is compared against other hosts' ratings to
-determine the best host for a new job.  A return of zero indicates this
+determine the best host for a new job.  This may include dynamic
+information such as instantaneous loading.  A return of zero indicates this
 host may not be used.  Ratings closer to zero are better.  Defaults to a
 function that includes the load_limit and the cpu percentage free.
 Evaluated in a Safe container, and can do only minimal core functions.
