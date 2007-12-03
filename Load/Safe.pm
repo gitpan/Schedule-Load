@@ -1,4 +1,4 @@
-# $Id: Safe.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Safe.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -24,7 +24,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.051';
+$VERSION = '3.052';
 
 ######################################################################
 #### Creators
@@ -46,7 +46,7 @@ sub new {
 sub _cache_check {
     my $self = shift;
     if (keys (%{$self->{_cache}}) > $self->{cache_max_entries}) {
-	# For speed, rather then a single entry, delete random ~10% of entries.
+	# For speed, rather than a single entry, delete random ~10% of entries.
 	foreach my $key (keys %{$self->{_cache}}) {
 	    if (rand(10)<=1.0) {
 		delete $self->{_cache}{$key};
@@ -108,7 +108,7 @@ Schedule::Load::Safe - Evaluate callback in Safe container with caching
 
 This package is for internal use of Schedule::Load.  It allows a function
 to be defined inside a Safe container, then saved inside a cache for later
-use.  This is significantly faster then creating a safe container for each
+use.  This is significantly faster than creating a safe container for each
 evaluation.
 
 =head1 DISTRIBUTION

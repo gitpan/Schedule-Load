@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 50_test.t 104 2007-05-02 14:08:29Z wsnyder $
+#$Id: 50_test.t 119 2007-11-27 16:41:07Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -18,7 +18,8 @@ use Test;
 use strict;
 
 use vars qw($Debug $Manual_Server_Start %Host_Load %Hold_Keys
-	    $Port %Invoke_Params);
+	    $Port %Invoke_Params $Top_PID);
+$Top_PID = $$;
 
 BEGIN { plan tests => 18 }
 BEGIN { require "t/test_utils.pl"; }
@@ -63,9 +64,7 @@ $Port = 12123;  $Port = socket_find_free (12123) if !$Manual_Server_Start;
 ############
 # Setup
 
-#$Debug = 1;
-$Schedule::Load::Debug = $Debug;
-$Schedule::Load::Hosts::Debug = $Debug;
+#debug(1);
 
 `rm -rf test_store`; #Ok if error
 mkdir ('test_store', 0777);
@@ -175,6 +174,12 @@ print "This program's kill isn't always reliable\n";
 ######################################################################
 # Test subroutines
 
+sub debug {
+    $Debug = shift;
+    $Schedule::Load::Debug = $Debug;
+    $Schedule::Load::Hosts::Debug = $Debug;
+}
+
 sub check_load {
     $scheduler->fetch;	# Else cache will still have old loading
     foreach my $hostname (keys %Host_Load) {
@@ -264,10 +269,12 @@ sub check_server_up {
 my %pids;
 END { cleanup_and_exit(); }
 sub cleanup_and_exit {
+    return if $Top_PID ne $$;
     # END routine to kill children
+    my $pt = new Proc::ProcessTable( 'cache_ttys' => 1);   # Load it only once for speed
     foreach my $pid (keys %pids) {
 	next if !$pid;
-	my @proc = Schedule::Load::_subprocesses($pid);
+	my @proc = Schedule::Load::_subprocesses($pid, $pt);
 	foreach (@proc) {
 	    kill 9, $_;  print "  Killing $_ (child of $pid)\n";
 	}

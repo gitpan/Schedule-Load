@@ -1,5 +1,5 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Load.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -27,7 +27,7 @@ use IO::Pipe;
 use IO::File;
 use IO::Socket;
 use Sys::Hostname;
-use Storable qw (nfreeze thaw);
+use Storable qw();
 use Socket;
 require Exporter;
 BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
@@ -38,7 +38,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.051';
+$VERSION = '3.052';
 $Debug = 0;
 
 %_Default_Params = (
@@ -59,11 +59,14 @@ $Debug = 0;
 
 sub _subprocesses {
     my $parent = shift || $$;
+    my $pt = shift;  # Generally undef, unless happen to have process table already
     # All pids under the given parent
     # Used by testing module
     # Same function in Parallel::Forker::_subprocesses
     use Proc::ProcessTable;
-    my $pt = new Proc::ProcessTable( 'cache_ttys' => 1); 
+    if (!$pt) {
+	$pt = new Proc::ProcessTable( 'cache_ttys' => 1); 
+    }
     my %parent_pids;
     foreach my $p (@{$pt->table}) {
 	$parent_pids{$p->pid} = $p->ppid;
@@ -98,7 +101,7 @@ sub _pfreeze {
     my $ref = shift;
     my $debug = shift;
 
-    my $serialized = $cmd . " " . unpack ("h*", nfreeze $ref) . "\n";
+    my $serialized = $cmd . " " . unpack ("h*", Storable::nfreeze $ref) . "\n";
     if ($debug) {
 	printf "AFREEZE $cmd: %s\n", Data::Dumper::Dumper($ref);
     }
@@ -112,7 +115,17 @@ sub _pthaw {
     $line =~ /^(\S+)\s*(\S*)/;
     my $cmd = $1; my $serialized = $2;
 
-    my $ref = thaw(pack ("h*", $serialized)) if $serialized;
+    my $ref;
+    if ($serialized) {
+	eval {
+	    # Tolerate storable version mismatches.  The error will look like
+	    # "Storable binary image v2.7 more recent then I am"
+	    $ref = Storable::thaw(pack ("h*", $serialized));
+	};
+	if (!$ref && $@) {
+	    $cmd = "THAW_ERROR-".$@;
+	}
+    }
     if ($debug) {
 	print "$cmd: ", Data::Dumper::Dumper($ref);
     }
@@ -339,7 +352,7 @@ operating system.  Often this is of little use, especially when the same
 program is used by many people.  The L<rschedule cmnd_comment> command or
 L<Schedule::Load::Schedule::cmnd_comment> function will assign a more
 verbose command to that process id.  For example, we use dc_shell, and put
-the name of the module being compiled into the comment, so rather then
+the name of the module being compiled into the comment, so rather than
 several copies of the generic "dc_shell" we see "dc module", "dc module2",
 etc.
 
@@ -354,7 +367,7 @@ For a this limited time, the load on the host will be incremented.  When
 the job begins and a little CPU time has elapsed the hold is released with
 a hold_release call, the timer expiring, or IPC::PidStat detecting the
 holding process died.  This will cause the load reported by L<rschedule
-hosts> to occasionally be higher then the number of jobs on that host.
+hosts> to occasionally be higher than the number of jobs on that host.
 
 =head1 FIXED LOADS
 

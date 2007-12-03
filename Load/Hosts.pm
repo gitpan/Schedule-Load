@@ -1,5 +1,5 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Hosts.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.051';
+$VERSION = '3.052';
 
 ######################################################################
 #### Globals
@@ -271,31 +271,62 @@ sub _hostname_width {
 
 ######################################################################
 ######################################################################
+#### Table printing
+
+sub format_table {
+    shift;  # Ignored; just so can object call it
+    my %params = (formats => [],
+		  data => [],
+		  @_);
+    # Given table with row of formats, where ^ is the width of the column,
+    # return string with data formatted.
+    my @widths;
+    foreach my $rowref (@{$params{data}}) {
+	for (my $col=0; $col<=$#{$rowref}; $col++) {
+	    $widths[$col] = length($rowref->[$col]||'')
+		if (($widths[$col]||0) < length($rowref->[$col]||''));
+	}
+    }
+    my @formats = (@{$params{formats}});
+    for (my $col=0; $col<=$#formats; $col++) {
+	my $width = $widths[$col] || 1;
+	$formats[$col] =~ s!\^!$width!;
+    }
+    my @out;
+    foreach my $rowref (@{$params{data}}) {
+	for (my $col=0; $col<=$#{$rowref}; $col++) {
+	    push @out, ' ' if $col>0;
+	    push @out, sprintf($formats[$col], $rowref->[$col]||'');
+	}
+	push @out, "\n";
+    }
+    return join ("", @out);
+}
+
+######################################################################
+######################################################################
 #### Information printing
 
 sub print_hosts {
     my $hosts = shift;
     # Overall machine status
-    my $out = "";
-    my $hwid = _hostname_width($hosts);
-    (my $FORMAT =      "%-${hwid}s   %4s     %4s    %6s%%      %5s     %6s    %2s    %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "RATE", "RL", "ARCH/OS");
+    my @fmts = ("%-^s", " %^s", "%^s",  "%^s%%",  "%^s",  "%^s",  "%^s"," %s");
+    my @data = ["HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "RATE", "RL", "ARCH/OS"];
     foreach my $host ($hosts->hosts_sorted) {
 	my $ostype = $host->archname ." ". $host->osvers;
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
-	$out.=sprintf ($FORMAT,
-		       $host->hostname, 
-		       $host->cpus_slash, 
-		       $host->max_clock, 
-		       sprintf("%3.1f", $host->total_pctcpu), 
-		       sprintf("%2.2f", $host->adj_load),
-		       $host->rating_text,
-		       ( ($host->reservable?"R":" ")
-			 . digit($host,'load_limit')),
-		       $ostype,
-		       );
+	push @data, [$host->hostname, 
+		     $host->cpus_slash, 
+		     $host->max_clock, 
+		     sprintf("%3.1f", $host->total_pctcpu), 
+		     sprintf("%2.2f", $host->adj_load),
+		     $host->rating_text,
+		     ( ($host->reservable?"R":" ")
+		       . digit($host,'load_limit')),
+		     $ostype,
+		     ];
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 sub print_holds {
@@ -320,58 +351,55 @@ sub print_holds {
 			   host => undef,
 		           code => "P",};
     }
-    my $out = "";
-    my $hwid = _hostname_width($hosts);
-    (my $FORMAT =           "%-10s %-${hwid}s %5s    %5s    %2s  %1s   %7s    %-${hwid}s  %-s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "USER", "UHOST", "UPID", "PRI", "L", "S", "WAIT", "ON_HOST", "COMMENT");
+    my @fmts = ("%-^s", " %-^s", " %^s",  "%^s", "%^s","%^s","%^s", "%-^s",    " %-s");
+    my @data = ["USER", "UHOST", "UPID", "PRI", "L",  "S",  "WAIT", "ON_HOST", "COMMENT"];
     foreach my $key (sort (keys %holdlist)) {
 	my $hold = $holdlist{$key}{hold};
 	my $host = $holdlist{$key}{host};
-	$out.=sprintf ($FORMAT,
-		       $hold->req_user,
-		       $hold->req_hostname,
-		       $hold->req_pid,
-		       $hold->req_pri,
-		       $hold->hold_load,
-		       $holdlist{$key}{code},
-		       Schedule::Load::Hosts::Proc->format_hhmm(time() - $hold->req_time),
-		       #
-		       ($host ? $host->hostname : "{pending}"), 
-		       $hold->comment,
-		       );
+	push @data, [$hold->req_user,
+		     $hold->req_hostname,
+		     $hold->req_pid,
+		     $hold->req_pri,
+		     $hold->hold_load,
+		     $holdlist{$key}{code},
+		     Schedule::Load::Hosts::Proc->format_hhmm(time() - $hold->req_time),
+		     #
+		     ($host ? $host->hostname : "{pending}"), 
+		     $hold->comment,
+		     ];
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 sub print_status {
     my $hosts = shift;
     # Daemon status, mostly for debugging
     my $out = "";
-    my $hwid = _hostname_width($hosts);
     {
-	(my $FORMAT =         "%-${hwid}s   %7s       %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
-	$out.=sprintf ($FORMAT, "CHOOSER", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS");
-	$out.=sprintf ($FORMAT,
-		       $hosts->{chooinfo}{slchoosed_hostname},
-		       ($hosts->{chooinfo}{slchoosed_version}||"?"),
-		       _format_time($hosts->{chooinfo}{slchoosed_connect_time}||0),
-		       sprintf("%2.3f",$hosts->{chooinfo}{last_command_delay}||0),
-		       $hosts->{chooinfo}{slchoosed_status});
+	my @fmts = ("%-^s",    "%^s",     "%-^s",      "%^s",   " %-s");
+	my @data = ["CHOOSER", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS"];
+	push @data, [$hosts->{chooinfo}{slchoosed_hostname},
+		     ($hosts->{chooinfo}{slchoosed_version}||"?"),
+		     _format_time($hosts->{chooinfo}{slchoosed_connect_time}||0),
+		     sprintf("%2.3f",$hosts->{chooinfo}{last_command_delay}||0),
+		     $hosts->{chooinfo}{slchoosed_status}];
+	$out .= $hosts->format_table(formats=>\@fmts, data=>\@data);
     }
-
-    (my $FORMAT =     "%-${hwid}s    %6s%%    %5s     %6s     %7s        %-19s        %6s      %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "TotCPU","LOAD", "RATE", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS");
-    foreach my $host ($hosts->hosts_sorted) {
-	$out.=sprintf ($FORMAT,
-		       $host->hostname, 
-		       sprintf("%3.1f", $host->total_pctcpu), 
-		       sprintf("%2.2f", $host->adj_load),
-		       $host->rating_text,
-		       ($host->get_undef('slreportd_version')||"?"),
-		       _format_time($host->slreportd_connect_time||0),
-		       (defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
-		       $host->slreportd_status,
-		       );
+    {
+	my @fmts = ("%-^s", "%^s%%", "%^s",  "%^s",  "%^s",     "%-^s",      "%^s",   " %-s");
+	my @data = ["HOST", "TotCPU","LOAD", "RATE", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS"];
+	foreach my $host ($hosts->hosts_sorted) {
+	   push @data, [$host->hostname, 
+			sprintf("%3.1f", $host->total_pctcpu), 
+			sprintf("%2.2f", $host->adj_load),
+			$host->rating_text,
+			($host->get_undef('slreportd_version')||"?"),
+			_format_time($host->slreportd_connect_time||0),
+			(defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
+			$host->slreportd_status,
+			];
+	}
+	$out .= $hosts->format_table(formats=>\@fmts, data=>\@data);
     }
     return $out;
 }
@@ -379,52 +407,47 @@ sub print_status {
 sub print_top {
     my $hosts = shift;
     # Top processes
-    my $out = "";
-    my $hwid = _hostname_width($hosts);
-    (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %4s     %6s    %-5s     %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"); 
+    my @fmts = ("%-^s", "%^s", "%-^s", "%^s",  "%^s", "%-^s",  "%^s", "%^s%%"," %-s");
+    my @data = ["HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"]; 
     foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    next if ($p->pctcpu < $hosts->{min_pctcpu});
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
-	    $out.=sprintf ($FORMAT, 
-			   $host->hostname,
-			   $p->pid, 
-			   $p->uname,		$p->nice0, 
-			   int(($p->size||0)/1024/1024)."M",
-			   $p->state, 		$p->time_hhmm,
-			   sprintf("%3.1f", $p->pctcpu),
-			   substr ($comment,0,18),
-			   );
+	    push @data, [$host->hostname,
+			 $p->pid, 
+			 $p->uname,		$p->nice0, 
+			 int(($p->size||0)/1024/1024)."M",
+			 $p->state, 		$p->time_hhmm,
+			 sprintf("%3.1f", $p->pctcpu),
+			 substr ($comment,0,18),
+			 ];
 	}
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 sub print_loads {
     my $hosts = shift;
     # Top processes
-    my $out = "";
-    my $hwid = _hostname_width($hosts);
-    (my $FORMAT =      "%-${hwid}s   %6s    %-10s   %3s    %6s     %5s%%  %s\n") =~ s/\s\s+/ /g;
-    $out.=sprintf ($FORMAT, "HOST", "PID", "USER", "NIC", "RUNTM", "CPU","COMMAND"); 
+    my @fmts = ("%-^s", "%-^s", "%^s", "%-^s", "%^s", "%^s",   "%^s%%", " %-s");
+    my @data = ["HOST", "REQHOST", "PID", "USER", "NIC", "RUNTM", "CPU",   "COMMAND"]; 
     foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
-	    $out.=sprintf ($FORMAT, 
-			   $host->hostname,
-			   $p->pid, 
-			   $p->uname,
-			   $p->nice,
-			   $p->time_hhmm,
-			   sprintf("%3.1f", $p->pctcpu),
-			   $comment,
-			   );
+	    push @data, [$host->hostname,
+			 ($p->exists('req_hostname')? $p->req_hostname : ''),
+			 $p->pid, 
+			 $p->uname,
+			 $p->nice,
+			 $p->time_hhmm,
+			 sprintf("%3.1f", $p->pctcpu),
+			 $comment,
+			 ];
 	}
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 sub print_kills {
@@ -433,24 +456,23 @@ sub print_kills {
 	signal=>0,
 	@_,};
     # Top processes
-    my $out = "";
-    my $hwid = _hostname_width($hosts);
-    (my $FORMAT =           "ssh %-${hwid}s kill %s%6s #   %-8s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
+    my @fmts = ("ssh %-^s"," kill %s","%^s"," #   %-^s","%-^s","%^s","%^s%%","%-s");
+    my @data;
     foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
-	    $out.=sprintf ($FORMAT, 
-			   $host->hostname,
-			   ($params->{signal}?"-$params->{signal} ":""),
-			   $p->pid, 
-			   $p->uname, 		$p->time_hhmm,
-			   sprintf("%3.1f", $p->pctcpu),
-			   $comment,
-			   );
+	    push @data, [($p->exists('req_hostname')? $p->req_hostname : $host->hostname),
+			 ($params->{signal}?"-$params->{signal} ":""),
+			 $p->pid, 
+			 $host->hostname,
+			 $p->uname, 		$p->time_hhmm,
+			 sprintf("%3.1f", $p->pctcpu),
+			 $comment,
+			 ];
 	}
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 sub print_classes {
@@ -476,15 +498,13 @@ sub print_classes {
 	$classnum++;
     }
 
-    my $hostwidth = 4;
-    foreach my $host ($hosts->hosts_sorted) {
-	$hostwidth = length($host->hostname) if $hostwidth < length($host->hostname);
-    }
+    my @fmts = ("%-^s", "%-s");
+    my @data;
 
     my $classes = $classnum;
     $classnum = 0;
     foreach my $class (@classes) {
-	$out.=sprintf ("%-${hostwidth}s ", ($classnum==$classes-1)?"HOST":"");
+	my $out;
 	for (my $prtclassnum = 0; $prtclassnum<$classnum; $prtclassnum++) {
 	    $out .= (" "x$col_width[$prtclassnum])."|";
 	}
@@ -493,11 +513,12 @@ sub print_classes {
 	    $out .= ("-"x$col_width[$prtclassnum])."-";
 	}
 	$out.= "-$class_letter{$class}" if $classnum!=$classes-1;
-	$out.=sprintf ("- %s\n", $class);
+	$out.=sprintf ("- %s", $class);
 	$classnum++;
+	push @data, [(($classnum==$classes-1)?"HOST":""), $out];
     }
     foreach my $host ($hosts->hosts_sorted) {
-	$out .= sprintf "%-${hostwidth}s ", $host->hostname;
+	my $out;
 	$classnum = 0;
 	foreach my $class (@classes) {
 	    my $val = $host->get_undef($class);
@@ -512,9 +533,9 @@ sub print_classes {
 	    $out .= sprintf (" %$col_width[$classnum]s", $chr);
 	    $classnum++;
 	}
-	$out .= "\n";
+	push @data, [$host->hostname, $out];
     }
-    return $out;
+    return $hosts->format_table(formats=>\@fmts, data=>\@data);
 }
 
 ######################################################################
@@ -733,6 +754,14 @@ from many machines across a entire network.
 
 Fetch the data structures from across the network.  This also creates
 a new object.  Accepts the port and host parameters.
+
+=item $self->format_table(formats=>[...], data=>[...]);
+
+Used internally by the print routines, but may be useful for external use
+also.  Return a table as a string.  Named format argument must be an array
+reference containing sprintf strings, plus '^' may be used as the width of
+the widest data column.  Named data argument must be two dimmensional array
+reference of the data table to be printed.
 
 =item $self->restart ()
 

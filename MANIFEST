@@ -15,6 +15,7 @@ Load/Safe.pm
 Load/Schedule.pm
 Makefile.PL
 MANIFEST
+MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
 README
 readme.texi

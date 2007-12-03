@@ -1,5 +1,5 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Schedule.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -33,7 +33,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.051';
+$VERSION = '3.052';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -255,7 +255,7 @@ sub set_stored {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->hosts)';
     my $params = {
 	host=>undef,
-	#set_const=>undef,	# If true, put into constant rather then stored data
+	#set_const=>undef,	# If true, put into constant rather than stored data
 	@_,};
 
     print __PACKAGE__."::set_stored($params->{host})\n" if $Debug;
@@ -379,7 +379,7 @@ L<Schedule::Load::Hosts>.
 
 =item allow_none
 
-If allow_none is true, if there is less then a free CPU across the entire
+If allow_none is true, if there is less than a free CPU across the entire
 network, then no cpu will be chosen.  This is useful for programs that can
 dynamically adjust their outstanding job count.  (Presumably you would only
 set allow_none if you already have one job running, or you can get

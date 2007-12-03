@@ -1,5 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Chooser.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -21,7 +21,7 @@ require Exporter;
 use POSIX;
 use Socket;
 use IO::Socket;
-use IO::Select;
+use IO::Poll;
 use Tie::RefHash;
 use Net::hostent;
 use Sys::Hostname;
@@ -35,12 +35,14 @@ use Schedule::Load::Hosts;
 use IPC::PidStat;
 
 use strict;
-use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Select
+use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Poll
 	    $Exister
 	    $Time $Time_Usec
 	    $Server_Self %ChooInfo);
 use vars qw(%Holds);  # $Holds{hold_key}[listofholds] = HOLD {hostname=>, scheduled=>1,}
 use Carp;
+
+use constant POLLIN_ETC => (POLLIN | POLLERR | POLLHUP | POLLNVAL);
 
 ######################################################################
 #### Configuration Section
@@ -48,10 +50,11 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.051';
+$VERSION = '3.052';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
+use constant _BLOCKING_TEST => 0;  # Test the behavior of EWOULDBLOCK; very bad for performance
 
 ######################################################################
 #### Globals
@@ -99,24 +102,33 @@ sub start {
     $ChooInfo{slchoosed_connect_time} = time();
     $ChooInfo{slchoosed_status} = "Connected";
 
-    $Select = IO::Select->new($server);
+    $Poll = IO::Poll->new;
+    $Poll->mask($server => POLLIN_ETC);
+
     $Hosts = Schedule::Load::Schedule->new(_fetched=>-1,);  #Mark as always fetched
 
     $Exister = new IPC::PidStat();
-    $Select->add($Exister->fh);
+    $Poll->mask($Exister->fh => POLLIN_ETC);
 
     $self->_probe_reset_check();
 
     while (1) {
 	# Anything to read?
-	foreach my $fh ($Select->can_read(3)) { #3 secs maximum
+	my @r; my @w;
+    	my $npolled = $Poll->poll(3);  #3 secs maximum
+	if ($npolled>=0) {
+	    @r = $Poll->handles(POLLIN);
+	    @w = $Poll->handles(POLLOUT);
+	}
+	#if ($Debug) { my @h=$Poll->handles; _timelog("Poll $npolled : list$#h r$#r w$#w $!\n"); }
+	foreach my $fh (@r) {
 	    stash_time();	# Cache the time
 	    if ($fh == $server) {
 		# Accept a new connection
 		_timelog("Accept\n") if $Debug;
 		my $clientfh = $server->accept();
 		next if !$clientfh;
-		$Select->add($clientfh);
+		$Poll->mask($clientfh => POLLIN_ETC);
 		my $flags = fcntl($clientfh, F_GETFL, 0) or die "%Error: Can't get flags";
 		fcntl($clientfh, F_SETFL, $flags | O_NONBLOCK) or die "%Error: Can't nonblock";
 		# new Client
@@ -124,6 +136,8 @@ sub start {
 			      delayed=>0,
 			      ping_time => $Time,
 			      last_reqdyn_time => undef,
+			      inbuffer => '',
+			      outbuffer => '',
 			  };
 		$Clients{$clientfh} = $client;
 	    }
@@ -134,6 +148,10 @@ sub start {
 		# Input traffic on other client
 		_client_service($Clients{$fh});
 	    }
+	}
+	foreach my $fh (@w) {
+	    _timelog("poll now allows write\n") if _BLOCKING_TEST;
+	    _client_send($Clients{$fh},'');
 	}
 	# Action or timer expired, only do this if time passed
 	if (time() != $Time) {
@@ -235,7 +253,7 @@ sub _client_close {
 	delete $Hosts->{hosts}{$hostname};
     }
 
-    $Select->remove($fh);
+    $Poll->remove($fh);
     eval {
 	$fh->close();
     };
@@ -289,7 +307,7 @@ sub _client_service {
 	next if $client->{_broken};
 	my $line = $1;
 	#_timelog("CHOOSER GOT: $line\n") if $Debug;
-	_timelog("$client->{host}{hostname}  ") if ($Debug && $client->{host});
+	_timelog($client->{host} ? "$client->{host}{hostname}  ":"client-$fh  ") if $Debug;
 	my ($cmd, $params) = _pthaw($line, $Debug);
 
 	if ($cmd eq "report_ping") {
@@ -346,7 +364,8 @@ sub _client_service {
 	} elsif ($cmd eq "chooser_close_all") {
 	    _client_close_all ($client);
 	} else {
-	    print "REQ UNKNOWN '$line\n" if $Debug;
+	    my $peer = _client_peeraddr($client)||'';
+	    print "%Warning: $peer: REQ UNKNOWN '$line\n" if $Debug;
 	}
     }
 }
@@ -359,13 +378,55 @@ sub _client_send {
 
     $SIG{PIPE} = 'IGNORE';
 
+    # Append to outbuffer
+    $client->{outbuffer} .= $out;
     my $fh = $client->{socket};
-    my $ok = Schedule::Load::Socket::send_and_check($fh, $out);
-    if (!$ok) {
-	_client_close ($client);
-	return 0;
+
+    while ($client->{outbuffer} ne "") {
+	my $ok = 1;
+
+	if (!$fh || !$fh->connected()) {
+	    _client_close ($client);
+	    return 0;
+	}
+
+	_timelog("_client_send_BLOCK ",length($client->{outbuffer}),"\n") if _BLOCKING_TEST;
+	my $rv = eval { return $fh->syswrite($client->{outbuffer}, _BLOCKING_TEST?10:undef); };
+	# Node ->connected call does a system getpeeraddr() call
+	if (!$fh || !$fh->connected() || ($! && $! != POSIX::EWOULDBLOCK)) {
+	    _client_close ($client);
+	    return 0;
+	}
+	# Truncate what did get out
+	$client->{outbuffer} = substr ($client->{outbuffer}, $rv);
+
+	if (_BLOCKING_TEST) {
+	    _timelog("testing blocking; fake return here\n");
+	    $rv = undef;
+	}
+	if (!defined $rv) {  # Couldn't write: very rare
+	    _timelog("Client syswrite would block, sending later\n") if $Debug;
+	    $Poll->mask($fh => (POLLIN_ETC | POLLOUT));
+	    $client->{_poll_out_mask} = 1;
+	    return 1;  # Ok, do rest later.
+	}
     }
-    return 1;
+
+    if ($client->{_poll_out_mask}) {  # All sent; stop polling for output ready
+	$Poll->mask($fh => POLLIN_ETC);
+	$client->{_poll_out_mask} = 0;
+    }
+    return 1; # Ok
+}
+
+sub _client_peeraddr {
+    my $client = shift || return undef;
+    # This may be slow - it may call the kernel, so only use it in debug code!
+    my $fh = $client->{socket} || return undef;
+    my $peer = getpeername($fh) || return undef;
+    my ($port,$ip) = sockaddr_in($peer);
+    return if !$port;
+    return inet_ntoa($ip).":$port";
 }
 
 sub _client_ping_timecheck {
@@ -498,18 +559,19 @@ sub _user_all_hosts_cmd {
     my $userclient = shift;
     my $cmd = shift;
     foreach my $host ($Hosts->hosts_unsorted) {
- 	_timelog("GET ->", $host->hostname, " $cmd") if $Debug;
 	my $dynto = ($host->get_undef('dynamic_cache_timeout') || $Server_Self->{dynamic_cache_timeout});
+	# For easier debug, be sure to have a _timelog under each of these branches
 	if ($host->{_dyn_update} > ($Time - $dynto)) {
-	    _timelog("    skipping: _cached ",$host->hostname,"\n") if $Debug;
+	    _timelog("  GETskip _cached ->", $host->hostname, " $cmd") if $Debug;
 	} else {
 	    # Cache is out of date.
 	    if ($host->{_reqdyn_pending}  # Otherwise only issue one request, it'll satisfy everyone.
 		&& $host->{_reqdyn_pending} > ($Time - $Server_Self->{ping_dead_timeout})) { # Recent
 		# Already issued response, but haven't gotten it, wait for existing request
-		_timelog("    skipping: _reqdyn_pending ",$host->hostname,"\n") if $Debug;
+		_timelog("  GETskip reqdyn_pending ->", $host->hostname, " $cmd") if $Debug;
 		_user_done_mark ($host, $userclient);
 	    } else {
+		_timelog("  GET ->", $host->hostname, " $cmd") if $Debug;
 		if ($cmd =~ /report_get_dynamic/) {
 		    $host->{client}{last_reqdyn_time} = [$Time, $Time_Usec]; # For DELAY column
 		}
@@ -549,7 +611,7 @@ sub _user_send_type {
 			  type => $type,
 			  hostname => $host->{hostname},
 			  );
-	    # Rather then sending lots of little packets, join them all up to send
+	    # Rather than sending lots of little packets, join them all up to send
 	    # in one large packet.
 	    push @frozen, _pfreeze ("host", \%params, 0&&$Debug);
 	}
@@ -641,7 +703,7 @@ sub _schedule_one_resource {
     #	   -> How many more jobs host can take before we should turn off new jobs
 
     # Note we need to subtract resources which aren't scheduled yet, but have higher
-    # priorities then this request.  This allows for a pool request of 10 machines
+    # priorities than this request.  This allows for a pool request of 10 machines
     # to eventually start without being starved by little 1 machine requests that keep
     # getting issued.
 
@@ -731,7 +793,7 @@ sub _schedule {
     foreach my $hold (sort {$a->compare_pri_time($b)} (values %Holds)) {
 	my $schreq = $hold->{schreq};
 	next if !$schreq;
-	# Careful, we generally want $schreq rather then $schparams in this loop...
+	# Careful, we generally want $schreq rather than $schparams in this loop...
 	_timelog("  SCHREQ for $hold->{hold_key}\n") if $Debug;
 	my %resscratch = ( partial_hosts=>[] );   # Passed to the user's callback
 	foreach my $resref (@{$schreq->{resources}}) {

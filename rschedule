@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-# $Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $
+# $Id: rschedule 121 2007-12-03 17:46:01Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -228,14 +228,14 @@ END {
 ######################################################################
 
 sub usage {
-    print '$Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $ ', "\n";
+    print '$Id: rschedule 121 2007-12-03 17:46:01Z wsnyder $ ', "\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: rschedule 98 2007-04-03 15:22:10Z wsnyder $ ';
+    print 'Id: $Id: rschedule 121 2007-12-03 17:46:01Z wsnyder $ ';
     print "\n";
     exit (1);
 }
@@ -282,7 +282,7 @@ B<rschedule> B<holds>
 
 B<rschedule> B<status>
 
-B<rschedule> [ B<--host=>I<host> B<--override>] B<reserve>
+B<rschedule> [ B<--host=>I<host> ] B<reserve>
 
 B<rschedule> [ B<--host=>I<host> ] B<release>
 
@@ -333,7 +333,7 @@ Displays a listing of the classes of jobs each host can run.
 =item cmnd_comment <pid>
 
 Sets the command comment for the given process ID.  In rschedule top (rtop)
-displays, this will be shown rather then the name of the command.  Command
+displays, this will be shown rather than the name of the command.  Command
 comments are inherited by children of commented parents.
 
 =item deny_class <class>
@@ -343,7 +343,7 @@ Sets the hostname to deny the specified class of jobs.
 =item fixed_load <pid>
 
 Sets the given process ID to have that process count as one host load, even
-if it is using less CPU time then that due to high disk activity or other
+if it is using less CPU time than that due to high disk activity or other
 sleeps.
 
 =item holds
@@ -370,7 +370,11 @@ jobs.
 
 =item release
 
-Releases a host from dedicated use.  Use --host to specify which host.
+Releases a host from dedicated use.  Use --host to specify which host.  
+
+Any person may release a host, not just the original user requesting the
+reservation.  You may also use "release reserve" together to change an
+existing reservation.
 
 =item reserve
 

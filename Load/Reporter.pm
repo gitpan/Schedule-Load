@@ -1,5 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm 111 2007-05-25 14:40:56Z wsnyder $
+# $Id: Reporter.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
@@ -20,12 +20,12 @@ require Exporter;
 
 use Socket;
 use IO::Socket;
-use IO::Select;
+use IO::Select;  # IO::Select is ok instead of IO::Poll as we only have at max 2 handles
 use POSIX;
 
 use Proc::ProcessTable;
 use Unix::Processors;
-use Storable qw (nstore retrieve);
+use Storable qw();
 use Schedule::Load qw (:_utils);
 use Schedule::Load::FakeReporter;
 use Sys::Hostname;
@@ -47,7 +47,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.051';
+$VERSION = '3.052';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -83,7 +83,7 @@ sub start {
 	#Documented
 	#Undocumented
 	timeout=>$Debug?2:30,		# Sec before host socket connect times out
-	alive_time=>$Debug?10:30,	# Sec to send alive message (must be sooner then Chooser's ping_dead_time)
+	alive_time=>$Debug?10:30,	# Sec to send alive message (must be sooner than Chooser's ping_dead_time)
 	const_changed=>0,		# const or stored has changed, update in chooser
 	@_};
     bless $self, $class;
@@ -110,6 +110,8 @@ sub start {
     $self->_fill_stored;
     $self->_fill_dynamic;
 
+    my $inbuffer = '';
+
     while (1) {
 	# See if alive
 	if ($self->{socket}) {
@@ -124,12 +126,13 @@ sub start {
 	    $select->remove($select->handles);
 	    $select->add($Exister->fh);
 	    $select->add($self->{socket}) if $self->{socket};
+	    $inbuffer = '';
 	}
 
 	# Wait for someone to become active
 	# or send a alive message every 60 secs (in case slchoosed goes down & up)
 	sleep($self->{alive_time}) if ($select->count() == 0); # select won't block if no fd's
-	my $inbuffer = '';
+
       input:
 	foreach my $fh ($select->can_read ($self->{alive_time})) {
 	    print "Servicing input\n" if $Debug;
@@ -564,7 +567,7 @@ sub _fill_stored {
 	if (defined $self->{stored_filename}
 	    && -r $self->{stored_filename}) {
 	    print "Retrieve $self->{stored_filename}\n" if $Debug;
-	    $self->{stored} = retrieve($self->{stored_filename});
+	    $self->{stored} = Storable::retrieve($self->{stored_filename});
 	}
 	$self->{const_changed} = 1;
 	$self->{stored_read} = 1;
@@ -593,7 +596,7 @@ sub _set_stored {
     if (!$params->{set_const}
 	&& defined $self->{stored_filename}) {
 	print "Store $self->{stored_filename}\n" if $Debug;
-	nstore $self->{stored}, $self->{stored_filename};
+	Storable::nstore $self->{stored}, $self->{stored_filename};
 	chmod 0666, $self->{stored_filename};
     }
 }

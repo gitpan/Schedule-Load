@@ -2,6 +2,16 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.052 12/3/2007
+
+***	All rschedule reports now have columns that expand to fit the contents.
+
+***	Include requesting hostname in "rschedule loads".
+
+***	Ignore, rather than exit Chooser, when reporter has bad Storable module.
+
+****	Improve Chooser performance with 100s of hosts under heavy network loads.
+
 * Schedule::Load 3.051 5/25/2007
 
 **	Use hold_load so hosts don't exceed their load_limit. [Bryce Denney]
@@ -130,11 +140,11 @@ The contributors that suggested a given feature are shown in [].
 	This may break older programs, contact the author if this causes pain.
 
 ***	Schedule::Load::Schedule::hosts_of_class is depreciated.
-	Equivelent is hosts_match(classes=>{....}, allow_reserved=>1)
+	Equivalent is hosts_match(classes=>{....}, allow_reserved=>1)
 
 ***	Night hours is depreciated.  The default loading is now the
 	full clump, if you wish to use a smaller percentage, make a local
-	derrived class.  Likewise editing of the classes list to add
+	derived class.  Likewise editing of the classes list to add
 	_night suffixes is removed.  (This was never consistently applied.)
 
 * Schedule::Load 2.104 4/15/2003
@@ -200,7 +210,7 @@ The contributors that suggested a given feature are shown in [].
 
 **	Added Schedule::Host->idle_host_names and rschedule idle_host_names.
 
-***	Hold_keys now allow hold_load, for setting the loading to other then 1.
+***	Hold_keys now allow hold_load, for setting the loading to other than 1.
 
 ***	Use ssh in place of rsh.
 
@@ -213,7 +223,7 @@ The contributors that suggested a given feature are shown in [].
 * Schedule::Load 1.4 11/30/2000
 
 **	Added --dhost option to slchoosed
-	Specifing multiple slchoosed hostnames now provides a backup server
+	Specifying multiple slchoosed hostnames now provides a backup server
 	if the first server goes down.  When the first server comes back up, it
 	will reset the backup server and take over processing.
 
@@ -236,13 +246,13 @@ The contributors that suggested a given feature are shown in [].
 **	First CPAN Release
 
 ----------------------------------------------------------------------
-$Id: Changes 111 2007-05-25 14:40:56Z wsnyder $
+$Id: Changes 121 2007-12-03 17:46:01Z wsnyder $
 DESCRIPTION: Documentation on change history for this package
 ----------------------------------------------------------------------
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-Copyright 2000-2006 by Wilson Snyder.  This program is free software;
+Copyright 2000-2007 by Wilson Snyder.  This program is free software;
 you can redistribute it and/or modify it under the terms of either the GNU
 General Public License or the Perl Artistic License.
 
