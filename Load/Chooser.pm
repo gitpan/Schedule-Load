@@ -1,16 +1,15 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-# $Id: Chooser.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::Chooser;
@@ -25,6 +24,7 @@ use IO::Poll;
 use Tie::RefHash;
 use Net::hostent;
 use Sys::Hostname;
+use Sys::Syslog;
 use Time::HiRes qw (gettimeofday);
 BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
 #use Devel::Leak; our $Leak;
@@ -37,6 +37,7 @@ use IPC::PidStat;
 use strict;
 use vars qw($VERSION $Debug %Clients $Hosts $Client_Num $Poll
 	    $Exister
+	    @Messages
 	    $Time $Time_Usec
 	    $Server_Self %ChooInfo);
 use vars qw(%Holds);  # $Holds{hold_key}[listofholds] = HOLD {hostname=>, scheduled=>1,}
@@ -50,10 +51,12 @@ use constant POLLIN_ETC => (POLLIN | POLLERR | POLLHUP | POLLNVAL);
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
+use constant LOG_MESSAGE_TIMEOUT => 20*60; # Secs to expire old messages
+use constant LOG_MESSAGE_COUNT => 50; # Maximum messages to keep (so don't overflow memory)
 use constant _BLOCKING_TEST => 0;  # Test the behavior of EWOULDBLOCK; very bad for performance
 
 ######################################################################
@@ -82,7 +85,9 @@ sub start {
 	%Schedule::Load::_Default_Params,
 	#Documented
 	dynamic_cache_timeout=>10,	# Secs to hold cache for, if not set differently by reporter
-	ping_dead_timeout=>90,		# Secs lack of ping indicates dead (greater than reporter's alive_time)
+	dynamic_slow_timeout=>9,	# Secs to wait for response before considering host unresponsive and ignoring it
+	ping_dead_timeout=>120,		# Secs lack of ping indicates dead (greater than reporter's alive_time)
+	#Debug: dynamic_cache_timeout=>2, dynamic_slow_timeout=>5, ping_dead_timeout=>10,
 	subchooser_restart_num=>12,	# For first 12 times,
 	subchooser_first_time=>20,	# Sec between first 12 chooser_restart_if_reporters
 	subchooser_repeat_time=>(5*60),	# Sec between other chooser_restart_if_reporters
@@ -91,16 +96,12 @@ sub start {
     $Server_Self = $self;	# Only should be one... Need some options
 
     # Open the socket
-    _timelog("Server up, listening on $self->{port}\n") if $Debug;
+    _timesyslog('info',"slchoosed up on ".hostname()." $self->{port}\n");
     my $server = IO::Socket::INET->new( Proto     => 'tcp',
 					LocalPort => $self->{port},
 					Listen    => SOMAXCONN,
 					Reuse     => 1)
 	or die "$0: Error, socket: $!";
-
-    # Update status
-    $ChooInfo{slchoosed_connect_time} = time();
-    $ChooInfo{slchoosed_status} = "Connected";
 
     $Poll = IO::Poll->new;
     $Poll->mask($server => POLLIN_ETC);
@@ -110,12 +111,15 @@ sub start {
     $Exister = new IPC::PidStat();
     $Poll->mask($Exister->fh => POLLIN_ETC);
 
+    # Update status
+    $self->_chooser_set_status();
+
     $self->_probe_reset_check();
 
     while (1) {
 	# Anything to read?
 	my @r; my @w;
-    	my $npolled = $Poll->poll(3);  #3 secs maximum
+	my $npolled = $Poll->poll(3);  #3 secs maximum
 	if ($npolled>=0) {
 	    @r = $Poll->handles(POLLIN);
 	    @w = $Poll->handles(POLLOUT);
@@ -230,6 +234,18 @@ sub _probe_reset {
     }
 }
 
+sub _chooser_set_status {
+    my $self = shift;
+    $self->_probe_init();
+    my $subhosts="";
+    foreach my $host (@{$Server_Self->{_subhosts}}) {
+	$subhosts .= ($subhosts ? ":" : "; primary to ");
+	$subhosts .= $host;
+    }
+    $ChooInfo{slchoosed_connect_time} = time();
+    $ChooInfo{slchoosed_status} = "Connected".$subhosts;
+}
+
 ######################################################################
 ######################################################################
 #### Client servicing
@@ -245,12 +261,13 @@ sub _client_close {
 	my $host = $client->{host};
 	my $hostname = $host->hostname || "";	# Will be deleted, so get before delete
 	_timelog(" Closing host ",$host->hostname,"\n") if $Debug;
-	delete $host->{const};	# Delete before user_done, so user doesn't see them
+	_timesyslog("info","slreportd $hostname disconnected\n");
+	delete $Hosts->{hosts}{$hostname};
+	delete $host->{const};	# Delete before user_wait, so user doesn't see them
 	delete $host->{stored};
 	delete $host->{dynamic};
-	_user_done_finish ($host);
+	_user_wait_finish ($host);
 	delete $host->{client};
-	delete $Hosts->{hosts}{$hostname};
     }
 
     $Poll->remove($fh);
@@ -284,7 +301,7 @@ sub _client_done {
 sub _client_service {
     # Loop getting commands from a specific client
     my $client = shift || return;
-    
+
     my $fh = $client->{socket};
     my $data = '';
     my $rv;
@@ -323,12 +340,13 @@ sub _client_service {
 	    _host_dynamic ($client, "dynamic", $params);
 	    $client->{host}{_dyn_update} = $Time;
 	    $client->{host}{_reqdyn_pending} = 0;
+	    $client->{host}{const}{slreportd_unresponsive} = undef;
 	    if ($client->{last_reqdyn_time}) {
 		my $sec  = $Time - $client->{last_reqdyn_time}[0];
 		my $usec =  $Time_Usec - $client->{last_reqdyn_time}[1];
 		$client->{host}{const}{slreportd_delay} = $sec + $usec * 1.0e-6;
 	    }
-	    _user_done_finish ($client->{host});
+	    _user_wait_finish ($client->{host});
 	}
 	# User commands
 	elsif ($cmd eq "get_const_load_proc"
@@ -398,7 +416,7 @@ sub _client_send {
 	    return 0;
 	}
 	# Truncate what did get out
-	$client->{outbuffer} = substr ($client->{outbuffer}, $rv);
+	$client->{outbuffer} = substr ($client->{outbuffer}, $rv) if $rv;
 
 	if (_BLOCKING_TEST) {
 	    _timelog("testing blocking; fake return here\n");
@@ -433,9 +451,21 @@ sub _client_ping_timecheck {
     # See if any clients haven't pinged
     foreach my $client (values %Clients) {
 	#print "Ping Check $client->{ping_time} Now $Time  Dead $Server_Self->{ping_dead_timeout}\n" if $Debug;
-	if ($client->{host} && ($client->{ping_time} < ($Time - $Server_Self->{ping_dead_timeout}))) {
-	    _timelog("Client hasn't pinged lately, disconnecting\n") if $Debug;
-	    _client_close ($client);
+	if (my $host = $client->{host}) {
+	    if (($Time - $client->{ping_time}) > $Server_Self->{ping_dead_timeout}) {
+		my $hostname = $host->{hostname} || "UNK";
+		_timesyslog("notice", "slreportd $hostname not responsive, bye\n");
+		_client_close ($client);
+	    } elsif ($host->{_reqdyn_pending}
+		     && (($Time - $host->{_reqdyn_pending}) > $Server_Self->{dynamic_slow_timeout})) {
+		my $hostname = $host->{hostname} || "UNK";
+		if (!$host->{const}{slreportd_unresponsive}) {
+		    _timesyslog("info", "slreportd $hostname seems slow to respond\n");
+		}
+		$host->{const}{slreportd_delay} = $Time - $host->{_reqdyn_pending};
+		$host->{const}{slreportd_unresponsive} = $Time;
+		_user_wait_finish ($host);
+	    }
 	}
     }
 }
@@ -475,6 +505,7 @@ sub _host_start {
 		# We have two reporters fighting.  Tell what's up and ignore all data.
 		my $cmt = ("%Error: Conflicting slreportd deamons on ".$oldhost->slreportd_hostname
 			   ." and ".$host->slreportd_hostname);
+		_timesyslog("notice",$cmt."\n");
 		$oldhost->{const}{slreportd_status} = $cmt;
 		$oldhost->{stored}{reserved} = $cmt;
 		$host->{client}{_broken} = 1;
@@ -483,6 +514,8 @@ sub _host_start {
 	    }
 	    _client_close($oldhost->{client});
 	}
+    } else {
+	_timesyslog("info","slreportd $hostname joined\n");
     }
 
     tie %{$host->{waiters}}, 'Tie::RefHash';
@@ -490,6 +523,7 @@ sub _host_start {
     $client->{host} = $host;
     #_timelog("const: ", Data::Dumper::Dumper($host)) if $Debug;
 }
+
 
 sub _host_const_chooseinfo {
     my $host = shift;
@@ -502,7 +536,7 @@ sub _host_dynamic {
     my $client = shift || return;
     my $field = shift;
     my $params = shift;
-    # load/proc command: 
+    # load/proc command:
     $client->{host}{$field} = $params;
 }
 
@@ -520,6 +554,7 @@ sub _user_to_reporter {
     if ($hostnames eq '-all') {
 	my @hostnames = ();
 	foreach my $host ($Hosts->hosts_unsorted) {
+	    # We'll notifiy even "unresponsive" hosts
 	    push @hostnames, $host->hostname;
 	}
 	$hostnames = \@hostnames;
@@ -541,10 +576,10 @@ sub _user_get {
     my $flags = shift;
 
     my $cmd_start_time = [$Time, $Time_Usec];
-    _user_done_action ($userclient,
+    _user_wait_action ($userclient,
 		       \&_user_send_done_cb, [$userclient, $flags, $cmd_start_time]);
     _user_all_hosts_cmd ($userclient, $cmd);
-    _user_done_check($userclient);
+    _user_wait_check($userclient);
 }
 
 sub _user_send_done_cb {
@@ -559,17 +594,26 @@ sub _user_all_hosts_cmd {
     my $userclient = shift;
     my $cmd = shift;
     foreach my $host ($Hosts->hosts_unsorted) {
+	# We include unresponsive hosts
 	my $dynto = ($host->get_undef('dynamic_cache_timeout') || $Server_Self->{dynamic_cache_timeout});
 	# For easier debug, be sure to have a _timelog under each of these branches
-	if ($host->{_dyn_update} > ($Time - $dynto)) {
+	if ($host->{_dyn_update}
+	    && $host->{_dyn_update} > ($Time - $dynto)) {
 	    _timelog("  GETskip _cached ->", $host->hostname, " $cmd") if $Debug;
+	} elsif ($host->{const}{slreportd_unresponsive}) {
+	    # Reporter hasn't given us a result in a while, so don't bother to ask it for more work
+	    # This also prevents a "ping_slow_timeout" length pause for *every* requestor.
+	    # We assume it will evenutally give a reply, which will clear unresponsive.
+	    # If not, it'll eventually hit the ping_dead_timeout
+	    _timelog("  GETskip _unresponsive ->", $host->hostname, " $cmd") if $Debug;
+	    # Update timestamp so "rschedule status" sees it increment
+	    $host->{const}{slreportd_delay} = $Time - $host->{_reqdyn_pending};
 	} else {
 	    # Cache is out of date.
-	    if ($host->{_reqdyn_pending}  # Otherwise only issue one request, it'll satisfy everyone.
-		&& $host->{_reqdyn_pending} > ($Time - $Server_Self->{ping_dead_timeout})) { # Recent
+	    if ($host->{_reqdyn_pending}) {  # Otherwise only issue one request, it'll satisfy everyone.
 		# Already issued response, but haven't gotten it, wait for existing request
 		_timelog("  GETskip reqdyn_pending ->", $host->hostname, " $cmd") if $Debug;
-		_user_done_mark ($host, $userclient);
+		_user_wait_mark ($host, $userclient);
 	    } else {
 		_timelog("  GET ->", $host->hostname, " $cmd") if $Debug;
 		if ($cmd =~ /report_get_dynamic/) {
@@ -577,8 +621,8 @@ sub _user_all_hosts_cmd {
 		}
 		if (_client_send ($host->{client}, $cmd)) {
 		    # Mark that we need activity from each of these before being done
-		    _user_done_mark ($host, $userclient);
 		    $host->{_reqdyn_pending} = $Time;
+		    _user_wait_mark ($host, $userclient);
 		} # Else host down; ignore it
 	    }
 	}
@@ -595,8 +639,10 @@ sub _user_send {
     _user_send_type ($client, "const") if ($types =~ /const/);
     _user_send_type ($client, "stored") if ($types =~ /load/);
     _user_send_type ($client, "dynamic") if ($types =~ /load/ || $types =~ /proc/);
-    _make_chooinfo  (($Time - $cmd_start_time->[0]) + ($Time_Usec - $cmd_start_time->[1]) * 1.0e-6);
-    _client_send    ($client, _pfreeze ("chooinfo", \%ChooInfo, 0)) if ($types =~ /chooinfo/);
+    if ($types =~ /chooinfo/) {
+	_update_chooinfo (($Time - $cmd_start_time->[0]) + ($Time_Usec - $cmd_start_time->[1]) * 1.0e-6);
+	_client_send    ($client, _pfreeze ("chooinfo", \%ChooInfo, 0));
+    }
 }
 
 sub _user_send_type {
@@ -605,7 +651,11 @@ sub _user_send_type {
     # Send specific data type to user
     my @frozen;
     foreach my $host ($Hosts->hosts_sorted) {
-	if (defined $host->{$type}) {
+	# We include unresponsive hosts
+	if (defined $host->{$type}
+	    # If the host is really slow it may have just connected but not yet sent all
+	    # of the dynamic information.  If so, ignore it.
+	    && $host->{hostname} && $host->{_dyn_update}) {
 	    #_timelog("Host $host name $host->{hostname}\n") if $Debug;
 	    my %params = (table => $host->{$type},
 			  type => $type,
@@ -623,7 +673,7 @@ sub _user_send_type {
 
 ######################################################################
 
-sub _user_done_action {
+sub _user_wait_action {
     my $userclient = shift;
     my $callback = shift;
     my $argsref = shift;
@@ -632,7 +682,7 @@ sub _user_done_action {
     $userclient->{wait_action_argsref} = $argsref;
 }
 
-sub _user_done_mark {
+sub _user_wait_mark {
     my $host = shift;
     my $userclient = shift;
     # Mark this user as needing new info from host before returning status
@@ -641,7 +691,7 @@ sub _user_done_mark {
     $userclient->{wait_count} ++;
 }
 
-sub _user_done_finish {
+sub _user_wait_finish {
     my $host = shift;
     # Host finished, dec count see if done with everything client needed
 
@@ -649,11 +699,11 @@ sub _user_done_finish {
 	_timelog("Dewait $host $userclient\n") if $Debug;
 	delete $host->{waiters}{$userclient};
 	$userclient->{wait_count} --;
-	_user_done_check($userclient);
+	_user_wait_check($userclient);
     }
 }
 
-sub _user_done_check {
+sub _user_wait_check {
     my $userclient = shift;
     if ($userclient->{wait_count} == 0) {
 	_timelog("Dewait *DONE*\n") if $Debug;
@@ -677,23 +727,23 @@ sub _user_schedule_sendback {
     my $schresult = _schedule ($schparams);
     _client_send ($userclient, _pfreeze ("schrtn", $schresult, $Debug));
     _client_done ($userclient);
-}    
+}
 
 sub _user_schedule {
     my $userclient = shift;
     my $schparams = shift;
-    
-    _user_done_action ($userclient,
+
+    _user_wait_action ($userclient,
 		       \&_user_schedule_sendback, [$userclient, $schparams]);
     _user_all_hosts_cmd ($userclient, "report_get_dynamic\n");
-    _user_done_check($userclient);
+    _user_wait_check($userclient);
 }
 
 sub _schedule_one_resource {
     my $schparams = shift;
     my $resreq = shift;		# ResourceReq reference
     my $resscratch = shift;	# Passed to user's callback; not safe for internals; they may modify it!
-    
+
     #Factors:
     #  hosts_match:  reserved, match_cb, classes
     #	   -> Things that absolutely must be correct to schedule here
@@ -715,6 +765,7 @@ sub _schedule_one_resource {
     my $totcpus = 0;
     # hosts_match can be slow, plus it constructs a list.  It's faster to loop here.
     foreach my $host ($Hosts->hosts_sorted) {
+	next if $host->{const}{slreportd_unresponsive};
 	# host_match takes: classes, match_cb, allow_reserved
 	# we can remove $resscratch from here when code migrates to use rating_cb instead
 	next if !$host->host_match_chooser($resreq,$resscratch);
@@ -761,7 +812,7 @@ sub _schedule_one_resource {
     _timelog("    _Schedule_one Best ".($bestref?1:'none')
 	     ." Jobs $jobs Totcpu $totcpus  Free $freecpus  Running ".($resreq->{jobs_running}||0)
 	     ." Max $resreq->{max_jobs} KI $keep_idle\n") if $Debug;
-    
+
     return ($bestref,$jobs);
 }
 
@@ -769,7 +820,7 @@ sub _schedule {
     # Choose the best host and total resources available for scheduling
     my $schparams = shift;  #allow_none=>$, hold=>ref, requests=>[ref,ref...]
     _timelog("_schedule $schparams->{hold}{hold_key}\n") if $Debug;
-    
+
     # Clear holds for this request, the user may have scheduled (and failed) earlier.
     my $schhold = $schparams->{hold};
     if (my $oldhold = $Holds{$schhold->hold_key}) {
@@ -781,7 +832,7 @@ sub _schedule {
     }
     _holds_clear_unallocated();
     _holds_adjust();
-    
+
     _hold_add_schreq($schparams);
     $schparams->{hold} = undef;  # Now have schparams under hold, don't need circular reference
 
@@ -973,7 +1024,7 @@ sub _exist_traffic {
 ######################################################################
 #### Information to pass up to "rschedule status" for debugging
 
-sub _make_chooinfo {
+sub _update_chooinfo {
     my $delta_time = shift;
     # Load information we want to pass up to rschedule for debugging chooser
     # details from a client application
@@ -983,18 +1034,51 @@ sub _make_chooinfo {
 	next if !$hold->{schreq};
 	$ChooInfo{schreqs}{$hold->hold_key} = $hold;
     }
+
+    # Return all recent messages
+    _messages_remove();
+    $ChooInfo{slchoosed_messages} = \@Messages;
 }
 
 ######################################################################
 ######################################################################
 #### Little stuff
 
+sub _timesyslog {
+    my $class = shift;
+    my $msg = join('',@_);
+    _messages_remove();
+    push @Messages, [gettimeofday(), $class, $msg];
+    if ($Debug) {
+	_timelog($msg);
+    } else {
+	openlog('slchoosed', 'cons,pid', 'daemon');
+	syslog($class, $msg);
+	closelog();
+    }
+}
+
 sub _timelog {
     my $msg = join('',@_);
     my ($time, $time_usec) = gettimeofday();
-    my ($sec,$min,$hour,$mday,$mon) = localtime($time);
-    printf +("[%02d/%02d %02d:%02d:%02d.%06d] %s",
-	     $mon+1, $mday, $hour, $min, $sec, $time_usec, $msg);
+    print Schedule::Load::Hosts::_format_utime($time,$time_usec)." ".$msg;
+}
+
+sub _messages_remove {
+    # Remove all messages that are too old
+    my $expire = time() - LOG_MESSAGE_TIMEOUT();
+    while ($#Messages >= 0) {
+	my $msg = $Messages[0];
+	my $time = $msg->[0];
+	if ($time < $expire) {
+	    shift @Messages;
+	} else {
+	    last;
+	}
+    }
+    while ($#Messages >= LOG_MESSAGE_COUNT()) {
+	shift @Messages;
+    }
 }
 
 ######################################################################
@@ -1048,7 +1132,7 @@ dead.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

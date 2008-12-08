@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-#$Id: 50_test.t 119 2007-11-27 16:41:07Z wsnyder $
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'
@@ -209,7 +208,7 @@ sub testclass {
 	printf "  %s", $host->hostname;
     }
     print "\n\n";
-    
+
     for (my $i=0; $i<2; $i++) { #FIX 20
 	if ($Debug) {
 	    $scheduler->fetch;

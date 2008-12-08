@@ -4,7 +4,6 @@
 @settitle Perl Schedule::Load Installation
 @c %**end of header
 
-@c $Id: readme.texi 73 2006-03-02 13:01:12Z wsnyder $
 @c DESCRIPTION: TexInfo: DOCUMENT source run through texinfo to produce README file
 @c Use 'make README' to produce the output file
 @c Before release, run C-u C-c C-u C-a (texinfo-all-menus-update)
@@ -15,11 +14,11 @@
 This is the Schedule::Load Perl Package.
 
 @menu
-* Copyright::                   
-* Description::                 
-* Obtaining Distribution::      
-* Supported Systems::           
-* Installation::                
+* Copyright::
+* Description::
+* Obtaining Distribution::
+* Supported Systems::
+* Installation::
 @end menu
 
 @node Copyright, Description, Top, Top
@@ -71,7 +70,7 @@ See @samp{man Schedule::Load} after installation.
 @node Obtaining Distribution, Supported Systems, Description, Top
 @section Obtaining Distribution
 
-The latest version is available at 
+The latest version is available at
 @uref{http://www.perl.org/CPAN/}
 
 Download the latest package from that site, and decompress.

@@ -1,17 +1,16 @@
 #!/usr/bin/perl -w
 # slchoosed - choosing daemon for perl Schedule::Load
-# $Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 require 5.004;
@@ -85,11 +84,6 @@ if ($opt_quiet && !$Debug) {
 # Loop in case something kills us
 while (1) {
     print "Starting server: $0\n" if $Debug;
-    if (!$Debug) {
-	openlog($Script, 'cons,pid', 'daemon');
-	syslog('info', 'Started');
-	closelog();
-    }
     my $pid;
     if (!$opt_fork || (0==($pid = fork()))) {
         Schedule::Load::Chooser->start (%server_params,
@@ -98,7 +92,7 @@ while (1) {
 	exit(0);
     }
     die "%Error: Server aborted\n" if !$opt_fork;
-    
+
     waitpid($pid,0);
     warn "%Warning: Server aborted\n";
     sleep(1);
@@ -118,15 +112,13 @@ exit (0);
 ######################################################################
 
 sub usage {
-    print '$Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $ ', "\n";
+    print "Version: $Schedule::Load::VERSION\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed 102 2007-04-12 18:46:34Z wsnyder $ ';
-    print "\n";
     exit (1);
 }
 
@@ -207,7 +199,7 @@ Displays program version and exits.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

@@ -1,16 +1,15 @@
 # Load.pm -- Schedule load management
-# $Id: Load.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 require 5.005;
@@ -38,7 +37,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 $Debug = 0;
 
 %_Default_Params = (
@@ -55,7 +54,7 @@ $Debug = 0;
 		    );
 
 ######################################################################
-#### Internal utilities 
+#### Internal utilities
 
 sub _subprocesses {
     my $parent = shift || $$;
@@ -65,7 +64,7 @@ sub _subprocesses {
     # Same function in Parallel::Forker::_subprocesses
     use Proc::ProcessTable;
     if (!$pt) {
-	$pt = new Proc::ProcessTable( 'cache_ttys' => 1); 
+	$pt = new Proc::ProcessTable( 'cache_ttys' => 1);
     }
     my %parent_pids;
     foreach my $p (@{$pt->table}) {
@@ -242,7 +241,7 @@ that come with this package, and are installed in your standard binary
 directory like other unix applications.  This package provides these four
 Unix programs:
 
-=over 4 
+=over 4
 
 =item rschedule
 
@@ -294,7 +293,7 @@ requested the resource exits or is even killed without cleaning up.
 For those desiring finer control, or automation of new scripts, the Perl
 API may be used.  The Perl API includes the following major modules:
 
-=over 4 
+=over 4
 
 =item Schedule::Load::Hosts
 
@@ -390,7 +389,7 @@ time (~2%), the parent is the one shown in the loads list.
 =head1 SETUP
 
 When setting a new site with Schedule::Load, first read the DESCRIPTION
-section about the various daemons.  
+section about the various daemons.
 
 First, make sure you've built and installed this package on all of your
 machines.
@@ -421,7 +420,7 @@ consult your documentation or the web.
 
 =head1 ENVIRONMENT
 
-=over 4 
+=over 4
 
 =item SLCHOOSED_HOST
 
@@ -439,7 +438,7 @@ Default port number that slchoosed uses.  If not defined, defaults to
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
@@ -461,11 +460,11 @@ L<slreportd>, L<slchoosed>, L<slpolice>
 
 Perl modules:
 
-L<Schedule::Load::Chooser>, 
-L<Schedule::Load::FakeReporter>, 
+L<Schedule::Load::Chooser>,
+L<Schedule::Load::FakeReporter>,
 L<Schedule::Load::Hosts>,
 L<Schedule::Load::Hosts::Host>,
-L<Schedule::Load::Hosts::Proc>, 
+L<Schedule::Load::Hosts::Proc>,
 L<Schedule::Load::Reporter>,
 L<Schedule::Load::ResourceReq>,
 L<Schedule::Load::Schedule>

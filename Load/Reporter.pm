@@ -1,16 +1,15 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-# $Id: Reporter.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::Reporter;
@@ -34,7 +33,7 @@ use IPC::PidStat;
 use Config;
 
 use strict;
-use vars qw($VERSION $RSCHLIB $Debug %User_Names %Pid_Inherit 
+use vars qw($VERSION $RSCHLIB $Debug %User_Names %Pid_Inherit
 	    @Pid_Time_Base @Pid_Time $Os_Linux
 	    $Distrust_Pctcpu $Divide_Pctcpu_By_Cpu $ProcTimeToSec
 	    $Exister
@@ -47,7 +46,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -184,7 +183,7 @@ sub start {
 sub pt {
     my $self = shift;
     if (!$self->{pt}) {
-	$self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 ); 
+	$self->{pt} = new Proc::ProcessTable( 'cache_ttys' => 1 );
     }
     return $self->{pt};
 }
@@ -230,7 +229,8 @@ sub _open_host {
 sub _alive_check {
     my $self = shift;
     my $msg = "report_ping\n";
-    # Send a line to the socket to see if all is well
+    # Send a line to the socket to see if all is well.
+    # This also keeps at least part of the reporter paged-in.
     my $fh = $self->{socket};
     # Below may die if slchoosed goes down:
     # Our fork() loop will catch it and restart
@@ -254,7 +254,7 @@ sub _fill_and_send {
 	$self->_send_hash('stored');
     }
     # Dynamic must be last, it triggers sending info back to user
-    $self->_send_hash('dynamic');	
+    $self->_send_hash('dynamic');
 }
 
 sub _fill_const {
@@ -262,7 +262,7 @@ sub _fill_const {
     # fill constant values into self
     # (Values that don't change with loading -- known at startup)
     $self->{const_changed} = 1;
- 
+
     # Load our required keys
     $self->{const}{cpus}          ||= Unix::Processors->max_online();
     $self->{const}{physical_cpus} ||= Unix::Processors->max_physical();
@@ -421,7 +421,7 @@ sub _fill_dynamic {
 			}
 			printf "Found fixed_load %s\n", $p->pid if $Debug;
 		    }
-		    if ((!defined $cmndcomment) 
+		    if ((!defined $cmndcomment)
 			&& defined $Pid_Inherit{$searchpid}{cmndcomment}) {
 			$cmndcomment = $Pid_Inherit{$searchpid}{cmndcomment};
 		    }
@@ -578,7 +578,7 @@ sub _set_stored {
     my $self = shift;
     my $params = shift;
     # Set a stored field to a given value
-    
+
     $self->_fill_stored();	# Make sure up-to-date
     $self->{const_changed} = 1;
 
@@ -592,7 +592,7 @@ sub _set_stored {
 	    $self->{stored}{$var} = $value;
 	}
     }
-    
+
     if (!$params->{set_const}
 	&& defined $self->{stored_filename}) {
 	print "Store $self->{stored_filename}\n" if $Debug;
@@ -672,7 +672,7 @@ is lost.)   The path must be **ABSOLUTE** as the daemons do a chdir.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

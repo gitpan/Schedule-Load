@@ -1,16 +1,15 @@
 # Schedule::Load::Schedule.pm -- Schedule jobs across a network
-# $Id: Schedule.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::Schedule;
@@ -33,7 +32,7 @@ use Carp;
 
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
-$VERSION = '3.052';
+$VERSION = '3.060';
 @MoY = ('Jan','Feb','Mar','Apr','May','Jun',
 	'Jul','Aug','Sep','Oct','Nov','Dec');
 
@@ -83,7 +82,7 @@ sub hosts_of_class {
 sub reserve_default_comment {
     my $self = shift; ($self && ref($self)) or croak 'usage: $self->reserve_default_comment)';
     return sprintf ("$self->{username} at %02d-%s %02d:%02d",
-		    localtime->mday, $MoY[localtime->mon], 
+		    localtime->mday, $MoY[localtime->mon],
 		    localtime->hour, localtime->min),
 }
 
@@ -305,7 +304,7 @@ work for that module also work here.
 
 =head1 METHODS
 
-=over 4 
+=over 4
 
 =item best (...)
 
@@ -389,7 +388,7 @@ live-locked out of getting anything!)
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

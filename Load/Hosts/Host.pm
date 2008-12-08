@@ -1,16 +1,15 @@
 # Schedule::Load::Hosts::Host.pm -- Loading information about a host
-# $Id: Host.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::Hosts::Host;
@@ -31,7 +30,7 @@ use vars qw($VERSION $AUTOLOAD $Debug $Safer);
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 ######################################################################
 #### Globals
@@ -251,6 +250,7 @@ sub rating_text {
     my $self = shift; ($self && ref($self)) or croak 'usage: '.__PACKAGE__.'->rating(subroutine)';
     return "inf" if $self->reserved;
     return "inf" if !$self->rating;
+    return "slow" if $self->get_undef('slreportd_unresponsive');
     return sprintf("%4.2f", $self->rating);
 }
 
@@ -260,9 +260,9 @@ sub rating_text {
 sub AUTOLOAD {
     my $self = shift;
     my $type = ref($self) or croak "$self is not an ".__PACKAGE__." object";
-    
+
     (my $field = $AUTOLOAD) =~ s/.*://; # Remove package
-  
+
     if (exists ($self->{dynamic}{$field})) {
 	# Dynamic variables stay dynamic
 	eval "sub $field { return \$_[0]->{dynamic}{$field}; }";
@@ -306,7 +306,7 @@ Schedule::Load::Hosts::Host - Return information about a host
 This package provides accessors for information about a specific
 host obtained via the Schedule::Load::Host package.
 
-=over 4 
+=over 4
 
 =item classes_match
 
@@ -339,7 +339,7 @@ Returns the value of a specific field for this host.
 A accessor exists for each field returned by the fields() call.  Typical elements
 are described below.
 
-=over 4 
+=over 4
 
 =item adj_load
 
@@ -429,7 +429,7 @@ often exceed the physical memory size.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

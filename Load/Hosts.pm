@@ -1,16 +1,15 @@
 # Schedule::Load::Hosts.pm -- Loading information about hosts
-# $Id: Hosts.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::Hosts;
@@ -37,7 +36,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 ######################################################################
 #### Globals
@@ -114,7 +113,7 @@ sub hosts_sorted {
     # Return all hosts
     $self->_fetch_if_unfetched;
     # For speed, we're avoiding the hostname accessor.  Generally don't do this.
-    return (sort {$a->{const}{hostname} cmp $b->{const}{hostname}}  # $a->hostname cmp $b->hostname
+    return (sort {($a->{const}{hostname}||"") cmp ($b->{const}{hostname}||"")}  # $a->hostname cmp $b->hostname
 	    values %{$self->{hosts}});
 }
 
@@ -253,11 +252,18 @@ sub digit {
     return $val;
 }
 
-use Time::localtime;
 sub _format_time {
     my $value = shift || 0;
     my $t = localtime($value);
     return sprintf("%04d/%02d/%02d %02d:%02d:%02d", $t->year+1900,$t->mon+1,$t->mday,$t->hour,$t->min,$t->sec);
+}
+
+sub _format_utime {
+    my $time = shift;
+    my $time_usec = shift;
+    my ($sec,$min,$hour,$mday,$mon) = CORE::localtime($time);
+    return sprintf ("[%02d/%02d %02d:%02d:%02d.%06d]",
+		    $mon+1, $mday, $hour, $min, $sec, $time_usec);
 }
 
 sub _hostname_width {
@@ -283,8 +289,9 @@ sub format_table {
     my @widths;
     foreach my $rowref (@{$params{data}}) {
 	for (my $col=0; $col<=$#{$rowref}; $col++) {
-	    $widths[$col] = length($rowref->[$col]||'')
-		if (($widths[$col]||0) < length($rowref->[$col]||''));
+	    $rowref->[$col] = '' if !defined $rowref->[$col];
+	    $widths[$col] = length($rowref->[$col])
+		if (($widths[$col]||0) < length($rowref->[$col]));
 	}
     }
     my @formats = (@{$params{formats}});
@@ -296,7 +303,7 @@ sub format_table {
     foreach my $rowref (@{$params{data}}) {
 	for (my $col=0; $col<=$#{$rowref}; $col++) {
 	    push @out, ' ' if $col>0;
-	    push @out, sprintf($formats[$col], $rowref->[$col]||'');
+	    push @out, sprintf($formats[$col], $rowref->[$col]);
 	}
 	push @out, "\n";
     }
@@ -315,10 +322,10 @@ sub print_hosts {
     foreach my $host ($hosts->hosts_sorted) {
 	my $ostype = $host->archname ." ". $host->osvers;
 	$ostype = "Reserved: ".$host->reserved if ($host->reserved);
-	push @data, [$host->hostname, 
-		     $host->cpus_slash, 
-		     $host->max_clock, 
-		     sprintf("%3.1f", $host->total_pctcpu), 
+	push @data, [$host->hostname,
+		     $host->cpus_slash,
+		     $host->max_clock,
+		     sprintf("%3.1f", $host->total_pctcpu),
 		     sprintf("%2.2f", $host->adj_load),
 		     $host->rating_text,
 		     ( ($host->reservable?"R":" ")
@@ -364,7 +371,7 @@ sub print_holds {
 		     $holdlist{$key}{code},
 		     Schedule::Load::Hosts::Proc->format_hhmm(time() - $hold->req_time),
 		     #
-		     ($host ? $host->hostname : "{pending}"), 
+		     ($host ? $host->hostname : "{pending}"),
 		     $hold->comment,
 		     ];
     }
@@ -384,15 +391,31 @@ sub print_status {
 		     sprintf("%2.3f",$hosts->{chooinfo}{last_command_delay}||0),
 		     $hosts->{chooinfo}{slchoosed_status}];
 	$out .= $hosts->format_table(formats=>\@fmts, data=>\@data);
+	$out .= "\n";
     }
     {
-	my @fmts = ("%-^s", "%^s%%", "%^s",  "%^s",  "%^s",     "%-^s",      "%^s",   " %-s");
-	my @data = ["HOST", "TotCPU","LOAD", "RATE", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS"];
+	my @fmts = ("%-^s",    "%-^s", "%-^s", "%-^s",);
+	my @data = ["CHOOSER", "DATE", "LEVEL", "MESSAGE"];
+	my $msgs = $hosts->{chooinfo}{slchoosed_messages}||[];
+	foreach my $msg (@$msgs) {
+	    my $text = $msg->[3];  $text =~ s!\n$!!;
+	    push @data, [$hosts->{chooinfo}{slchoosed_hostname},
+			 _format_utime($msg->[0], $msg->[1]),
+
+			 $msg->[2], $text];
+	}
+	$out .= $hosts->format_table(formats=>\@fmts, data=>\@data);
+	$out .= "\n";
+    }
+    {
+	my @fmts = ("%-^s", "%^s%%", "%^s",  "%^s",  "%^s",      "%-^s",    "%-^s",       "%^s",   " %-s");
+	my @data = ["HOST", "TotCPU","LOAD", "RATE", "REPORTER", "VERSION", "CONNECTED", "DELAY", "DAEMON STATUS"];
 	foreach my $host ($hosts->hosts_sorted) {
-	   push @data, [$host->hostname, 
-			sprintf("%3.1f", $host->total_pctcpu), 
+	   push @data, [$host->hostname,
+			sprintf("%3.1f", $host->total_pctcpu),
 			sprintf("%2.2f", $host->adj_load),
 			$host->rating_text,
+			$host->slreportd_hostname,
 			($host->get_undef('slreportd_version')||"?"),
 			_format_time($host->slreportd_connect_time||0),
 			(defined $host->slreportd_delay ? sprintf("%2.3f",$host->slreportd_delay) : "?"),
@@ -408,17 +431,17 @@ sub print_top {
     my $hosts = shift;
     # Top processes
     my @fmts = ("%-^s", "%^s", "%-^s", "%^s",  "%^s", "%-^s",  "%^s", "%^s%%"," %-s");
-    my @data = ["HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"]; 
+    my @data = ["HOST", "PID", "USER", "NICE", "MEM", "STATE", "RUNTM", "CPU","COMMAND"];
     foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    next if ($p->pctcpu < $hosts->{min_pctcpu});
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
 	    push @data, [$host->hostname,
-			 $p->pid, 
-			 $p->uname,		$p->nice0, 
+			 $p->pid,
+			 $p->uname,		$p->nice0,
 			 int(($p->size||0)/1024/1024)."M",
-			 $p->state, 		$p->time_hhmm,
+			 $p->state,		$p->time_hhmm,
 			 sprintf("%3.1f", $p->pctcpu),
 			 substr ($comment,0,18),
 			 ];
@@ -431,14 +454,14 @@ sub print_loads {
     my $hosts = shift;
     # Top processes
     my @fmts = ("%-^s", "%-^s", "%^s", "%-^s", "%^s", "%^s",   "%^s%%", " %-s");
-    my @data = ["HOST", "REQHOST", "PID", "USER", "NIC", "RUNTM", "CPU",   "COMMAND"]; 
+    my @data = ["HOST", "REQHOST", "PID", "USER", "NIC", "RUNTM", "CPU",   "COMMAND"];
     foreach my $host ($hosts->hosts_sorted) {
 	foreach my $p ( sort {$b->pctcpu <=> $a->pctcpu}
 			@{$host->top_processes} ) {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
 	    push @data, [$host->hostname,
 			 ($p->exists('req_hostname')? $p->req_hostname : ''),
-			 $p->pid, 
+			 $p->pid,
 			 $p->uname,
 			 $p->nice,
 			 $p->time_hhmm,
@@ -464,9 +487,9 @@ sub print_kills {
 	    my $comment = ($p->exists('cmndcomment')? $p->cmndcomment:$p->fname);
 	    push @data, [($p->exists('req_hostname')? $p->req_hostname : $host->hostname),
 			 ($params->{signal}?"-$params->{signal} ":""),
-			 $p->pid, 
+			 $p->pid,
 			 $host->hostname,
-			 $p->uname, 		$p->time_hhmm,
+			 $p->uname,		$p->time_hhmm,
 			 sprintf("%3.1f", $p->pctcpu),
 			 $comment,
 			 ];
@@ -598,7 +621,7 @@ sub _request {
 		  );
 
     for (my $retry=0; $retry<$params{req_retries}; $retry++) {
-  	my $done = $self->_request_try($cmd);
+	my $done = $self->_request_try($cmd);
 	if ($done) {
 	    last;
 	} else {
@@ -616,7 +639,7 @@ sub _request_try {
 	$self->_open;
     }
     my $fh = $self->{_fh};
-    
+
     print "_request-> $cmd\n" if $Debug;
     $fh->send_and_check($cmd);
 
@@ -721,24 +744,24 @@ Schedule::Load::Hosts - Return host loading information across a network
     printf ($FORMAT, "HOST", "CPUs", "FREQ", "TotCPU", "LOAD", "ARCH/OS");
     foreach my $host ($hosts->hosts_sorted) {
 	printf STDOUT ($FORMAT,
-		       $host->hostname, 
-		       $host->cpus_slash, 
-		       $host->max_clock, 
-		       sprintf("%3.1f", $host->total_pctcpu), 
+		       $host->hostname,
+		       $host->cpus_slash,
+		       $host->max_clock,
+		       sprintf("%3.1f", $host->total_pctcpu),
 		       sprintf("%2.2f", $host->adj_load),
-		       $host->archname ." ". $host->osvers, 
+		       $host->archname ." ". $host->osvers,
 		       );
     }
 
     # Top processes
     (my $FORMAT =    "%-12s   %6s    %-10s     %-5s    %6s     %5s%%    %s\n") =~ s/\s\s+/ /g;
-    printf ($FORMAT, "HOST", "PID", "USER",  "STATE", "RUNTM", "CPU","COMMAND"); 
+    printf ($FORMAT, "HOST", "PID", "USER",  "STATE", "RUNTM", "CPU","COMMAND");
     foreach my $host ($hosts->hosts_sorted) {
 	foreach $p ($host->top_processes) {
-	    printf($FORMAT, 
+	    printf($FORMAT,
 		   $host->hostname,
-		   $p->pid, 		$p->uname,		
-		   $p->state, 		$p->time_hhmm,
+		   $p->pid,		$p->uname,
+		   $p->state,		$p->time_hhmm,
 		   $p->pctcpu,		$p->fname);
 	}
     }
@@ -748,7 +771,7 @@ Schedule::Load::Hosts - Return host loading information across a network
 This package provides information about host loading and top processes
 from many machines across a entire network.
 
-=over 4 
+=over 4
 
 =item $self->fetch ()
 
@@ -854,7 +877,7 @@ The port number of slchoosed.  Defaults to 'slchoosed' looked up via
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

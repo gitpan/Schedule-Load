@@ -1,16 +1,15 @@
 # Schedule::Load::FakeReporter.pm -- distributed lock handler
-# $Id: FakeReporter.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::FakeReporter;
@@ -26,7 +25,7 @@ use POSIX;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 ######################################################################
 #### Local process table
@@ -47,7 +46,7 @@ sub new {
 }
 
 sub table {
-    my $self = shift;  #proctable, not reporter 
+    my $self = shift;  #proctable, not reporter
     my @pids;
 
     my $load_limit = $self->{reportref}{const}{load_limit} || 1;
@@ -58,7 +57,7 @@ sub table {
 	if ($pid_track) {
 	    if ($pref->{req_hostname} eq hostname()) {
 		if (IPC::PidStat::local_pid_doesnt_exist($pid)) {
-		    # Process being tracked died.  fill_dynamic will delete the hash element 
+		    # Process being tracked died.  fill_dynamic will delete the hash element
 		    delete $Schedule::Load::Reporter::Pid_Inherit{$pid};
 		    next;
 		} elsif (!$self->{reportref}{fake}) {
@@ -171,7 +170,7 @@ See L<Schedule::Load::Reporter> for most accessors.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

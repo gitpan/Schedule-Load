@@ -1,16 +1,15 @@
 #!/usr/bin/perl -w
-# $Id: slpolice 104 2007-05-02 14:08:29Z wsnyder $
 ################ Introduction ################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 require 5.005;
@@ -65,7 +64,7 @@ complain();
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slpolice 104 2007-05-02 14:08:29Z wsnyder $ ', "\n";
+    print "Version: $Schedule::Load::VERSION\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
@@ -101,12 +100,12 @@ sub gather_loads {
 	    my $min = $p->time/60.0;
 	    $min = 0  if ($Debug);
 	    $min = 9999 if ($Debug && $p->uid eq $<);  # Test... Every one of runner's violates
-	    my $line = sprintf ($FORMAT, 
+	    my $line = sprintf ($FORMAT,
 				$host->hostname,
-				$p->pid, 
-				$p->uname,		$p->nice0, 
+				$p->pid,
+				$p->uname,		$p->nice0,
 				int(($p->size||0)/1024/1024)."M",
-				$p->state, 		$p->time_hhmm,
+				$p->state,		$p->time_hhmm,
 				sprintf("%3.1f", $p->pctcpu),
 				$p->fname);
 
@@ -136,8 +135,8 @@ sub gather_loads {
 		       body_line => "   ".$line,
 		       };
 		}
-	    } 
-	    
+	    }
+
 	    if ($cpu_limit
 		&& $min >= $cpu_limit) {
 		$Complaints{$name}{cpu}{$pid}
@@ -178,11 +177,11 @@ sub gather_reserveds {
 
 	    my $res = "Reserved: ".$host->reserved;
 	    my $line = sprintf ($FORMAT,
-				$host->hostname, 
+				$host->hostname,
 				$ostype,
 				$res);
 	    print "Res: $min: $line\n" if $Debug;
-	    
+
 	    if ($name ne "root"
 		&& $Opt_Reserved_Min
 		&& !$cmt
@@ -334,9 +333,9 @@ Displays program version and exits.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-L<nicercizerd> is available from L<http://veripool.com>.
+L<nicercizerd> is available from L<http://www.veripool.org>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

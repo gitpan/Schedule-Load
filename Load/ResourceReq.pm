@@ -1,15 +1,14 @@
-# $Id: ResourceReq.pm 122 2007-12-03 17:46:22Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2006 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # General Public License or the Perl Artistic License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 ######################################################################
 
 package Schedule::Load::ResourceReq;
@@ -24,7 +23,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.052';
+$VERSION = '3.060';
 
 ######################################################################
 #### Creators
@@ -72,7 +71,7 @@ sub set_fields {
 sub AUTOLOAD {
     my $self = shift;
     my $type = ref($self) or croak "$self is not an ".__PACKAGE__." object";
-    
+
     (my $field = $AUTOLOAD) =~ s/.*://; # Remove package
     if (exists ($self->{$field})) {
 	eval "sub $field { return \$_[0]->{$field}; }";
@@ -120,7 +119,7 @@ Create a new object with the parameters specified in the following section.
 The following parameters are accepted by new(), and are also may be read
 via accessor methods.
 
-=over 4 
+=over 4
 
 =item allow_reserved
 
@@ -176,7 +175,7 @@ Evaluated in a Safe container, and can do only minimal core functions.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU

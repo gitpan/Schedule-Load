@@ -27,7 +27,7 @@ prog=/usr/local/bin/slchoosed
 case $state in
   start)
 	if [ $EUID != 0 ]; then
-	    echo "Run as root, only root can do kill 0's"  
+	    echo "Run as root, only root can do kill 0's"
 	    exit 10
 	fi
         if [ -f $prog ]; then
@@ -53,7 +53,7 @@ case $state in
 	;;
   status)
         if test "x`pidof -o $$ -o $PPID -x slchoosed`" != x; then
-  	        ps f -ww `pidof -o $$ -o $PPID -x slchoosed`
+		ps f -ww `pidof -o $$ -o $PPID -x slchoosed`
         fi
 	exit 0
 	;;

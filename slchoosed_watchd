@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-# $Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $
 ######################################################################
 #
 # Copyright 2000-2007 by Wilson Snyder <wsnyder@wsnyder.org>.  This
@@ -100,15 +99,13 @@ while (1) {
 #----------------------------------------------------------------------
 
 sub usage {
-    print '$Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $ ', "\n";
+    print "Version: $Schedule::Load::VERSION\n";
     pod2usage(-verbose=>2, -exitval => 2);
     exit(1);
 }
 
 sub version {
     print "Version: $Schedule::Load::VERSION\n";
-    print 'Id: $Id: slchoosed_watchd 102 2007-04-12 18:46:34Z wsnyder $ ';
-    print "\n";
     exit (1);
 }
 
@@ -211,7 +208,7 @@ Displays program version and exits.
 
 =head1 DISTRIBUTION
 
-The latest version is available from CPAN and from L<http://www.veripool.com/>.
+The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
 Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
