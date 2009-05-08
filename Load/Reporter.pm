@@ -1,15 +1,5 @@
 # Schedule::Load::Reporter.pm -- distributed lock handler
-######################################################################
-#
-# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
-# you can redistribute it and/or modify it under the terms of either the GNU
-# General Public License or the Perl Artistic License.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
+# See copyright, etc in below POD section.
 ######################################################################
 
 package Schedule::Load::Reporter;
@@ -27,6 +17,7 @@ use Unix::Processors;
 use Storable qw();
 use Schedule::Load qw (:_utils);
 use Schedule::Load::FakeReporter;
+
 use Sys::Hostname;
 use Time::HiRes qw (gettimeofday);
 use IPC::PidStat;
@@ -46,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.060';
+$VERSION = '3.061';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 
@@ -83,7 +74,9 @@ sub start {
 	#Undocumented
 	timeout=>$Debug?2:30,		# Sec before host socket connect times out
 	alive_time=>$Debug?10:30,	# Sec to send alive message (must be sooner than Chooser's ping_dead_time)
+	stats_interval=>$Debug?2:60,	# Sec between polling of interval based plugin statistics
 	const_changed=>0,		# const or stored has changed, update in chooser
+	plugins => [],			# Plugin objects 
 	@_};
     bless $self, $class;
 
@@ -111,10 +104,35 @@ sub start {
 
     my $inbuffer = '';
 
+    my $poll_interval = $self->{alive_time};  # How often to wake up while loop, at maximum
+    $poll_interval = $self->{stats_interval} if $poll_interval > $self->{stats_interval};
+    $poll_interval ||= 1;  # as 0 would busy-wait!
+    my $last_alive_sec = 0;
+    my $last_stats_sec = 0;
+
+    foreach my $plugin (@{$self->{plugins}}) {
+	# Call twice, as some stats are interval based
+	$plugin->poll();  # Initialize plugin stats
+	$plugin->poll();  # Initialize plugin stats
+    }
+
+  service_loop:
     while (1) {
-	# See if alive
-	if ($self->{socket}) {
+	my ($now_sec, $now_usec) = gettimeofday();
+
+	# See if chooser is alive
+	if ($self->{socket}
+	    && (($now_sec - $last_alive_sec) >= $self->{alive_time})) {
 	    _alive_check ($self);
+	    $last_alive_sec = $now_sec;
+	}
+
+	# See if stats need polling
+	if (($now_sec - $last_stats_sec) >= $self->{stats_interval}) {
+	    foreach my $plugin (@{$self->{plugins}}) {
+		$plugin->poll($now_sec, $now_usec);
+	    }
+	    $last_stats_sec = $now_sec;
 	}
 
 	if (! $self->{socket}) {
@@ -130,10 +148,9 @@ sub start {
 
 	# Wait for someone to become active
 	# or send a alive message every 60 secs (in case slchoosed goes down & up)
-	sleep($self->{alive_time}) if ($select->count() == 0); # select won't block if no fd's
+	sleep($poll_interval) if ($select->count() == 0); # select won't block if no fd's
 
-      input:
-	foreach my $fh ($select->can_read ($self->{alive_time})) {
+	foreach my $fh ($select->can_read ($poll_interval)) {
 	    print "Servicing input\n" if $Debug;
 	    if ($fh == $Exister->fh) {
 		_exist_traffic();
@@ -144,7 +161,9 @@ sub start {
 		    my $data='';
 		    my $rv = $fh->sysread($data, POSIX::BUFSIZ);
 		    if (!defined $rv || (length $data == 0)) {
-			next input;
+			# May have disconnected; force an alive check
+			$last_alive_sec = 0;
+			next service_loop;
 		    }
 		    $inbuffer .= $data;
 		}
@@ -235,7 +254,10 @@ sub _alive_check {
     # Below may die if slchoosed goes down:
     # Our fork() loop will catch it and restart
     my $ok = $fh->send_and_check($msg);
-    if (!$ok || !$fh || !$fh->connected()) { $self->{socket} = undef; }
+    if (!$ok || !$fh || !$fh->connected()) {
+	print "Disconnect\n" if $Debug;
+	$self->{socket} = undef;
+    }
 }
 
 ######################################################################
@@ -342,6 +364,14 @@ sub _fill_dynamic {
     @Pid_Time_Base = ($sec,$usec) if !defined $Pid_Time_Base[0];
     my $deltastamp = ($sec-$Pid_Time_Base[0]) + 1e-6*($usec-$Pid_Time_Base[1]);
     @Pid_Time_Base = ($sec,$usec);
+
+    # Fill in plugin statistics
+    foreach my $plugin (@{$self->{plugins}}) {
+	my $stats = $plugin->stats;
+	foreach my $key (keys %{$stats}) {
+	    $self->{dynamic}{$key} = $stats->{$key};
+	}
+    }
 
     # Note the $p refs cannot be cached, they change when a new table call occurs
     my @pidlist;
@@ -674,9 +704,9 @@ is lost.)   The path must be **ABSOLUTE** as the daemons do a chdir.
 
 The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2009 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
-Lesser General Public License or the Perl Artistic License.
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 =head1 AUTHORS
 

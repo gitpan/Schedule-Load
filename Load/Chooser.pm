@@ -1,15 +1,5 @@
 # Schedule::Load::Chooser.pm -- distributed lock handler
-######################################################################
-#
-# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
-# you can redistribute it and/or modify it under the terms of either the GNU
-# General Public License or the Perl Artistic License.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
+# See copyright, etc in below POD section.
 ######################################################################
 
 package Schedule::Load::Chooser;
@@ -26,7 +16,7 @@ use Net::hostent;
 use Sys::Hostname;
 use Sys::Syslog;
 use Time::HiRes qw (gettimeofday);
-BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1;';}	#Ok if doesn't exist: debugging only
+BEGIN { eval 'use Data::Dumper; $Data::Dumper::Indent=1; $Data::Dumper::Sortkeys=1;';}	#Ok if doesn't exist: debugging only
 #use Devel::Leak; our $Leak;
 
 use Schedule::Load qw (:_utils);
@@ -51,7 +41,7 @@ use constant POLLIN_ETC => (POLLIN | POLLERR | POLLHUP | POLLNVAL);
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.060';
+$VERSION = '3.061';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -86,7 +76,7 @@ sub start {
 	#Documented
 	dynamic_cache_timeout=>10,	# Secs to hold cache for, if not set differently by reporter
 	dynamic_slow_timeout=>9,	# Secs to wait for response before considering host unresponsive and ignoring it
-	ping_dead_timeout=>120,		# Secs lack of ping indicates dead (greater than reporter's alive_time)
+	ping_dead_timeout=>300,		# Secs lack of ping indicates dead (greater than reporter's alive_time)
 	#Debug: dynamic_cache_timeout=>2, dynamic_slow_timeout=>5, ping_dead_timeout=>10,
 	subchooser_restart_num=>12,	# For first 12 times,
 	subchooser_first_time=>20,	# Sec between first 12 chooser_restart_if_reporters
@@ -578,7 +568,7 @@ sub _user_get {
     my $cmd_start_time = [$Time, $Time_Usec];
     _user_wait_action ($userclient,
 		       \&_user_send_done_cb, [$userclient, $flags, $cmd_start_time]);
-    _user_all_hosts_cmd ($userclient, $cmd);
+    _user_all_hosts_cmd ($userclient, $cmd, undef);
     _user_wait_check($userclient);
 }
 
@@ -593,14 +583,40 @@ sub _user_send_done_cb {
 sub _user_all_hosts_cmd {
     my $userclient = shift;
     my $cmd = shift;
+    my $schparams = shift;	# Schedule request to select hosts, or undef for all hosts
+
+  host:
     foreach my $host ($Hosts->hosts_unsorted) {
 	# We include unresponsive hosts
 	my $dynto = ($host->get_undef('dynamic_cache_timeout') || $Server_Self->{dynamic_cache_timeout});
+
 	# For easier debug, be sure to have a _timelog under each of these branches
 	if ($host->{_dyn_update}
 	    && $host->{_dyn_update} > ($Time - $dynto)) {
+	    # This is the fastest test and exit, so leave as first if(...) term
 	    _timelog("  GETskip _cached ->", $host->hostname, " $cmd") if $Debug;
-	} elsif ($host->{const}{slreportd_unresponsive}) {
+	    next host;
+	}
+
+	# Cache isn't fresh
+	# Test the match list
+	if ($schparams && $schparams->{resources}) {
+	    my $match;
+	  resreq:
+	    foreach my $resreq (@{$schparams->{resources}}) {
+		if ($host->host_match_chooser($resreq,undef)) {
+		    $match = 1;
+		    last resreq;
+		}
+	    }
+	    if (!$match) {
+		# classes doesn't match this host.  
+		_timelog("  GETskip _no_host_match ->", $host->hostname, " $cmd") if $Debug;
+		next host;
+	    }
+	}
+
+	if ($host->{const}{slreportd_unresponsive}) {
 	    # Reporter hasn't given us a result in a while, so don't bother to ask it for more work
 	    # This also prevents a "ping_slow_timeout" length pause for *every* requestor.
 	    # We assume it will evenutally give a reply, which will clear unresponsive.
@@ -735,7 +751,7 @@ sub _user_schedule {
 
     _user_wait_action ($userclient,
 		       \&_user_schedule_sendback, [$userclient, $schparams]);
-    _user_all_hosts_cmd ($userclient, "report_get_dynamic\n");
+    _user_all_hosts_cmd ($userclient, "report_get_dynamic\n", $schparams);
     _user_wait_check($userclient);
 }
 
@@ -1134,9 +1150,9 @@ dead.
 
 The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2009 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
-Lesser General Public License or the Perl Artistic License.
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 =head1 AUTHORS
 

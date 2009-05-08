@@ -1,16 +1,6 @@
 #!/usr/bin/perl -w
 # rschedule - User interface to perl Schedule::Load
-################ Introduction ################
-#
-# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
-# you can redistribute it and/or modify it under the terms of either the GNU
-# General Public License or the Perl Artistic License.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
+# See copyright, etc in below POD section.
 ######################################################################
 
 require 5.004;
@@ -83,8 +73,8 @@ if ($opt_similar) {
 		.'; }'));
 }
 
-# Fetch just once for speed
-$scheduler = Schedule::Load::Schedule->fetch(%server_params);
+# Create scheduler just once for speed
+$scheduler = Schedule::Load::Schedule->new(%server_params);
 my $secondcmd = 0;
 foreach (@commands) {
     print "\n" if $secondcmd++;
@@ -140,6 +130,14 @@ sub cmd {
 	    $scheduler->cmnd_comment (host=>$opt_host,
 				      comment=>$opt_comment,
 				      pid=>$param);
+	};
+    } elsif ($Last_Cmd eq "sleep") {
+	$Last_Cmd = "";
+	push @commands, sub {
+	    # For debug only
+	    print "Sleeping $param...\n" if $Debug;
+	    sleep $param;
+	    print "\n\n\n","="x70,"\n" if $Debug;
 	};
     }
     # New command options
@@ -198,6 +196,8 @@ sub cmd {
     } elsif ($param eq "set_const") {
 	$Last_Cmd = $param;
     } elsif ($param eq "set_stored") {
+	$Last_Cmd = $param;
+    } elsif ($param eq "sleep") {
 	$Last_Cmd = $param;
     } elsif ($param eq "fixed_load") {
 	$Last_Cmd = $param;
@@ -394,6 +394,10 @@ restarting the daemon after changing the slreportd's boot flags.
 Sets a stored reporter parameter to the specified value.  Slreportd will
 keep the information when rebooted, and override any set_const setting.
 
+=item sleep B<secs>
+
+For debugging only, sleep the specified number of seconds.
+
 =item status
 
 Displays a listing of each host and its daemon's status.  Intended only for
@@ -465,9 +469,9 @@ Displays program version and exits.
 
 The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2009 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
-Lesser General Public License or the Perl Artistic License.
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 =head1 SEE ALSO
 

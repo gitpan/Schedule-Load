@@ -1,8 +1,8 @@
 # DESCRIPTION: Perl ExtUtils: Type 'perl Makefile.PL' to create a Makefile for this package
 #
-# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
+# Copyright 2000-2009 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
-# General Public License or the Perl Artistic License.
+# Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 require 5.005;
 use ExtUtils::MakeMaker;
@@ -36,7 +36,7 @@ install-test::
 		install
 
 README: readme.texi
-	-rm \$@
+	-\$(RM_RF) \$@
 	makeinfo \$< --output \$@ --no-headers --no-validate
 
 ## Maintainer use:
@@ -54,7 +54,7 @@ maintainer-dist: preexist dist tag
 	svnorcvs release \$(DISTVNAME).tar.gz
 
 maintainer-clean: distclean
-	-rm README Makefile
+	-\$(RM_RF) README Makefile
 
 dist: distcheck README
 ";

@@ -2,6 +2,14 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.061 2009/05/08
+
+**	This package is now licensed under LGPL v3 and/or Artistic v2.0.
+
+**	Add slreportd plugins for disk performance and network usage.
+
+****	On schedule requests, chooser only contacts reporters of relevant class.
+
 * Schedule::Load 3.060 2008/12/08
 
 ***	Quickly service requests when a reporter is responding very slowly.
@@ -261,9 +269,9 @@ DESCRIPTION: Documentation on change history for this package
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-Copyright 2000-2007 by Wilson Snyder.  This program is free software;
+Copyright 2000-2009 by Wilson Snyder.  This program is free software;
 you can redistribute it and/or modify it under the terms of either the GNU
-General Public License or the Perl Artistic License.
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 Local variables:
 mode: outline

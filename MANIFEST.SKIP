@@ -10,3 +10,4 @@ test_store.*$
 \.tar\.
 \bblib\b
 \.svn/
+\.new

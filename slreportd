@@ -1,17 +1,7 @@
 #!/usr/bin/perl -w
 # slreportd - load reporting daemon for perl Schedule::Load
 # Note: adding -T taint checks will break the storable feature
-################ Introduction ################
-#
-# Copyright 2000-2006 by Wilson Snyder.  This program is free software;
-# you can redistribute it and/or modify it under the terms of either the GNU
-# General Public License or the Perl Artistic License.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
+# See copyright, etc in below POD section.
 ######################################################################
 
 require 5.004;
@@ -21,6 +11,8 @@ use Getopt::Long;
 use Pod::Usage;
 use Sys::Syslog;
 use Schedule::Load::Reporter;
+use Schedule::Load::Reporter::Disk;
+use Schedule::Load::Reporter::Network;
 use POSIX;
 use strict;
 
@@ -42,7 +34,7 @@ use vars qw(@Orig_ARGV);
 @Orig_ARGV = @ARGV;
 
 my $Debug;
-my %server_params = ();
+my %server_params = ( plugins => [] );
 my $opt_quiet = 1;
 my $opt_fork = 1;
 
@@ -64,6 +56,14 @@ if (!GetOptions (
 
 autoflush STDOUT 1;
 autoflush STDERR 1;
+
+# Init plugins
+if (!$server_params{fake}) {
+    push @{$server_params{plugins}}, (
+	Schedule::Load::Reporter::Disk->new(),
+	Schedule::Load::Reporter::Network->new(),
+    );
+}
 
 # We're chdiring to /, so make sure program name has path
 if ($0 !~ m!^/!) { $0 = getcwd()."/".$0; }
@@ -266,9 +266,9 @@ less desirable for scheduling.
 
 The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-Copyright 1998-2006 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2009 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
-Lesser General Public License or the Perl Artistic License.
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
 =head1 AUTHORS
 

@@ -11,6 +11,8 @@ Load/Hosts.pm
 Load/Hosts/Host.pm
 Load/Hosts/Proc.pm
 Load/Reporter.pm
+Load/Reporter/Disk.pm
+Load/Reporter/Network.pm
 Load/ResourceReq.pm
 Load/Safe.pm
 Load/Schedule.pm
@@ -29,5 +31,7 @@ slrsh
 t/00_pod.t
 t/01_manifest.t
 t/10_safe.t
+t/20_reporter_network.t
+t/21_reporter_disk.t
 t/50_test.t
 t/test_utils.pl
