@@ -41,7 +41,7 @@ use constant POLLIN_ETC => (POLLIN | POLLERR | POLLHUP | POLLNVAL);
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.061';
+$VERSION = '3.062';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;

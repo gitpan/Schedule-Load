@@ -12,6 +12,7 @@ use Pod::Usage;
 use Sys::Syslog;
 use Schedule::Load::Reporter;
 use Schedule::Load::Reporter::Disk;
+use Schedule::Load::Reporter::Filesys;
 use Schedule::Load::Reporter::Network;
 use POSIX;
 use strict;
@@ -61,6 +62,7 @@ autoflush STDERR 1;
 if (!$server_params{fake}) {
     push @{$server_params{plugins}}, (
 	Schedule::Load::Reporter::Disk->new(),
+	Schedule::Load::Reporter::Filesys->new(),
 	Schedule::Load::Reporter::Network->new(),
     );
 }

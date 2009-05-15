@@ -27,7 +27,7 @@ use Carp;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.061';
+$VERSION = '3.062';
 $Debug = 0;
 
 %_Default_Params = (

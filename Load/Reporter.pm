@@ -37,7 +37,7 @@ use Carp;
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.061';
+$VERSION = '3.062';
 
 $RSCHLIB = '/usr/local/lib';	# Edited by Makefile
 

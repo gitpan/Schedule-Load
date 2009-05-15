@@ -69,6 +69,7 @@ WriteMakefile(
 	      VERSION_FROM  => 'Load.pm',
 	      NO_META	=> 1,
 	      PREREQ_PM => {'IPC::Locker' => 1.410,	# IPC::PidStat, enclosed within
+			    'Filesys::DfPortable' => 0,
 			    'Proc::ProcessTable' => 0.40,
 			    'Pod::Usage' => 0,
 			    'Storable' => 0,

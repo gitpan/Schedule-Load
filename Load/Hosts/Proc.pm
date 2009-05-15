@@ -18,7 +18,7 @@ use Carp;
 #### Configuration Section
 
 # Other configurable settings.
-$VERSION = '3.061';
+$VERSION = '3.062';
 
 ######################################################################
 #### Globals

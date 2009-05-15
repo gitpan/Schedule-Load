@@ -2,6 +2,10 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.062 2009/05/15
+
+**	Add slreportd plugins for file system space.
+
 * Schedule::Load 3.061 2009/05/08
 
 **	This package is now licensed under LGPL v3 and/or Artistic v2.0.
