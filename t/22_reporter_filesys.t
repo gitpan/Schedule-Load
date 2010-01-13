@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # DESCRIPTION: Perl ExtUtils: Type 'make test' to test this package
 #
-# Copyright 2006-2009 by Wilson Snyder.  This program is free software;
+# Copyright 2006-2010 by Wilson Snyder.  This program is free software;
 # you can redistribute it and/or modify it under the terms of either the GNU
 # Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
@@ -29,6 +29,6 @@ if (!$ENV{VERILATOR_AUTHOR_SITE}) {
     skip("author only test (harmless)",1);
     skip("author only test (harmless)",1);
 } else {
-    ok($report->stats->{fs_local_size});
-    ok(defined $report->stats->{fs_local_pct});
+    ok($report->stats->{fs_local_size}        || $report->stats->{fs_root_size});
+    ok(defined $report->stats->{fs_local_pct} || defined defined $report->stats->{fs_root_pct});
 }

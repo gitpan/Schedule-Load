@@ -41,7 +41,7 @@ use constant POLLIN_ETC => (POLLIN | POLLERR | POLLHUP | POLLNVAL);
 # Other configurable settings.
 $Debug = $Schedule::Load::Debug;
 
-$VERSION = '3.062';
+$VERSION = '3.063';
 
 use constant RECONNECT_TIMEOUT => 180;	  # If reconnect 5 times in 3m then somthing is wrong
 use constant RECONNECT_NUMBER  => 5;
@@ -1150,7 +1150,7 @@ dead.
 
 The latest version is available from CPAN and from L<http://www.veripool.org/>.
 
-Copyright 1998-2009 by Wilson Snyder.  This package is free software; you
+Copyright 1998-2010 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 

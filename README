@@ -6,7 +6,7 @@ This is the Schedule::Load Perl Package.
 1.1 Copyright
 =============
 
-This package is Copyright 2000-2009 by Wilson Snyder
+This package is Copyright 2000-2010 by Wilson Snyder
 <wsnyder@wsnyder.org>.
 
    This program is free software; you can redistribute it and/or modify
@@ -74,9 +74,8 @@ platform.
   1. Before installing this module, you need the following modules
      available from CPAN:
 
-     Storable		(tested with 0.6.5)
-     Proc::ProcessTable;	(tested with 0.23)
-     Unix::Processors;	(tested with 1.6)
+     Storable		(tested with 0.6.5) Proc::ProcessTable;	(tested
+     with 0.23) Unix::Processors;	(tested with 1.6)
 
   2. `cd' to the directory containing this README notice.
 

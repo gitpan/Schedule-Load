@@ -2,6 +2,10 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.063 2010/01/12
+
+****	Fix false test failure with t/22_reporter_filesys.t.
+
 * Schedule::Load 3.062 2009/05/15
 
 **	Add slreportd plugins for file system space.
@@ -273,7 +277,7 @@ DESCRIPTION: Documentation on change history for this package
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-Copyright 2000-2009 by Wilson Snyder.  This program is free software;
+Copyright 2000-2010 by Wilson Snyder.  This program is free software;
 you can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
