@@ -2,6 +2,7 @@
 /CVS/
 ^.git/
 pm_to_blib$
+test_dir.*$
 test_store.*$
 ,v$
 \.(bak|new|old)$

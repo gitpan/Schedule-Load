@@ -2,6 +2,10 @@ Revision history for Perl extension Schedule::Load
 
 The contributors that suggested a given feature are shown in [].
 
+* Schedule::Load 3.064 2011/01/02
+
+****	Fix Pod::Usage dependency, rt51024.  [Andreas Koenig]
+
 * Schedule::Load 3.063 2010/01/12
 
 ****	Fix false test failure with t/22_reporter_filesys.t.
@@ -277,7 +281,7 @@ DESCRIPTION: Documentation on change history for this package
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-Copyright 2000-2010 by Wilson Snyder.  This program is free software;
+Copyright 2000-2011 by Wilson Snyder.  This program is free software;
 you can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
